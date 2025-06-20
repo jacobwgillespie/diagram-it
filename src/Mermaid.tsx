@@ -10,7 +10,7 @@ interface MermaidDiagramProps {
   diagram: string | null | undefined
   className?: string
   id?: string
-  suppressErrors?: boolean
+  onError?: (error: string) => void
 }
 
 type State = {
@@ -32,7 +32,6 @@ type Action =
   | {type: 'SET_DRAGGING'; payload: boolean}
   | {type: 'SET_DRAG_START'; payload: {x: number; y: number}}
   | {type: 'SET_ORIGINAL_SVG_SIZE'; payload: {width: number; height: number}}
-  | {type: 'SET_USER_INTERACTED'; payload: boolean}
   | {type: 'START_DRAG'; payload: {x: number; y: number}}
   | {type: 'STOP_DRAG'}
   | {type: 'RESET_VIEW'; payload: {containerWidth: number; containerHeight: number}}
@@ -44,15 +43,13 @@ function reducer(state: State, action: Action): State {
     case 'SET_TRANSFORM':
       return {...state, transform: action.payload}
     case 'UPDATE_TRANSFORM':
-      return {...state, transform: action.payload(state.transform)}
+      return {...state, transform: action.payload(state.transform), hasUserInteracted: true}
     case 'SET_DRAGGING':
       return {...state, isDragging: action.payload}
     case 'SET_DRAG_START':
       return {...state, dragStart: action.payload}
     case 'SET_ORIGINAL_SVG_SIZE':
       return {...state, originalSvgSize: action.payload}
-    case 'SET_USER_INTERACTED':
-      return {...state, hasUserInteracted: action.payload}
     case 'START_DRAG':
       return {
         ...state,
@@ -99,7 +96,7 @@ const initialState: State = {
   hasUserInteracted: false,
 }
 
-export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = false}: MermaidDiagramProps) => {
+export const MermaidDiagram = ({diagram, className = '', id, onError}: MermaidDiagramProps) => {
   // Ensure diagram is always a string
   const safeDiagram = diagram || ''
   const containerRef = useRef<HTMLDivElement>(null)
@@ -186,16 +183,15 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
         }
       } catch (error) {
         console.error('Error rendering mermaid diagram:', error)
-        if (!suppressErrors) {
-          containerRef.current.innerHTML = `<div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px;">
-            Error rendering diagram: ${error instanceof Error ? error.message : 'Unknown error'}
-          </div>`
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (onError) {
+          onError(errorMessage)
         }
       }
     }
 
     renderDiagram()
-  }, [safeDiagram, state.isInitialized, state.hasUserInteracted, suppressErrors])
+  }, [safeDiagram, state.isInitialized, state.hasUserInteracted, onError])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -281,7 +277,6 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
 
-      dispatch({type: 'SET_USER_INTERACTED', payload: true})
       dispatch({
         type: 'UPDATE_TRANSFORM',
         payload: (prev) => {
@@ -327,11 +322,7 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
           newX = Math.max(minX, Math.min(maxX, newX))
           newY = Math.max(minY, Math.min(maxY, newY))
 
-          return {
-            x: newX,
-            y: newY,
-            scale: newScale,
-          }
+          return {x: newX, y: newY, scale: newScale}
         },
       })
     },
@@ -363,7 +354,6 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
     const centerX = containerWidth / 2
     const centerY = containerHeight / 2
 
-    dispatch({type: 'SET_USER_INTERACTED', payload: true})
     dispatch({
       type: 'UPDATE_TRANSFORM',
       payload: (prev) => {
@@ -378,11 +368,7 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
         const newX = centerX - (centerX - prev.x) * scaleRatio
         const newY = centerY - (centerY - prev.y) * scaleRatio
 
-        return {
-          x: newX,
-          y: newY,
-          scale: newScale,
-        }
+        return {x: newX, y: newY, scale: newScale}
       },
     })
   }, [state.originalSvgSize])
@@ -398,7 +384,6 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
     const centerX = containerWidth / 2
     const centerY = containerHeight / 2
 
-    dispatch({type: 'SET_USER_INTERACTED', payload: true})
     dispatch({
       type: 'UPDATE_TRANSFORM',
       payload: (prev) => {
@@ -413,11 +398,7 @@ export const MermaidDiagram = ({diagram, className = '', id, suppressErrors = fa
         const newX = centerX - (centerX - prev.x) * scaleRatio
         const newY = centerY - (centerY - prev.y) * scaleRatio
 
-        return {
-          x: newX,
-          y: newY,
-          scale: newScale,
-        }
+        return {x: newX, y: newY, scale: newScale}
       },
     })
   }, [state.originalSvgSize])

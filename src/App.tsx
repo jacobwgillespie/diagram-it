@@ -288,7 +288,11 @@ function App() {
           <MermaidDiagram
             diagram={state.currentDiagram || defaultDiagram}
             className="h-full w-full"
-            suppressErrors={state.isStreaming}
+            onError={(error) => {
+              if (!state.isStreaming) {
+                dispatch({type: 'SET_ERROR', payload: error})
+              }
+            }}
           />
         </div>
       </div>
