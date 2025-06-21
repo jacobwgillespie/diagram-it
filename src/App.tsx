@@ -88,15 +88,13 @@ const createInitialState = (): State => ({
 export function App() {
   const [state, dispatch] = useReducer(reducer, createInitialState())
 
-  // Get session ID from URL search params or generate a new one
+  // Get session ID from URL hash or generate a new one
   const getSessionId = () => {
-    const searchParams = new URLSearchParams(location.search)
-    const existingId = searchParams.get('session')
-    if (existingId) return existingId
+    const hash = location.hash.slice(1) // Remove the # prefix
+    if (hash) return hash
 
     const newId = crypto.randomUUID()
-    searchParams.set('session', newId)
-    const newUrl = `${location.pathname}?${searchParams.toString()}`
+    const newUrl = `${location.pathname}${location.search}#${newId}`
     history.replaceState(null, '', newUrl)
     return newId
   }
