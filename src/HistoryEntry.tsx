@@ -4,7 +4,7 @@ import {cx} from 'class-variance-authority'
 interface HistoryEntryProps {
   entry: {
     id: string
-    type: 'user-code' | 'agent-code'
+    type: 'user' | 'agent'
     timestamp: number
     prompt?: string
     content: string
@@ -23,10 +23,10 @@ export function HistoryEntry({entry, isCurrent}: HistoryEntryProps) {
   return (
     <div ref={entryRef} className={cx('space-y-2 rounded p-4', isCurrent && 'border border-green-700 bg-green-900/30')}>
       <div className="flex items-center justify-between gap-2">
-        <div className={cx('text-xs font-medium', entry.type === 'user-code' ? 'text-green-400' : 'text-blue-400')}>
+        <div className={cx('text-xs font-medium', entry.type === 'user' ? 'text-green-400' : 'text-blue-400')}>
           {entry.type.toUpperCase().replace('-', ' ')}
         </div>
-        {entry.type === 'agent-code' && entry.prompt && (
+        {entry.type === 'agent' && entry.prompt && (
           <div className="flex-1 truncate text-xs text-neutral-500 italic">"{entry.prompt}"</div>
         )}
         <div className="font-mono text-xs text-neutral-500">{new Date(entry.timestamp).toLocaleTimeString()}</div>

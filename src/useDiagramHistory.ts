@@ -2,9 +2,9 @@ import {useCallback, useRef} from 'react'
 import {useLocalStorage} from './useLocalStorage'
 
 interface DiagramHistoryEntry {
-  type: 'user-code' | 'agent-code'
+  type: 'user' | 'agent'
   content: string
-  prompt?: string // Only for agent-code entries
+  prompt?: string // Only for agent entries
   timestamp: number
   id: string
 }
@@ -36,26 +36,30 @@ export function useDiagramHistory(
   storageKey: string = 'diagram-conversation-history',
 ): [string, DiagramHistoryActions] {
   const createInitialHistory = (): DiagramHistoryState => ({
-    entries: initialCode ? [{
-      type: 'user-code',
-      content: initialCode,
-      timestamp: Date.now(),
-      id: Math.random().toString(36).substr(2, 9),
-    }] : [],
+    entries: initialCode
+      ? [
+          {
+            type: 'user',
+            content: initialCode,
+            timestamp: Date.now(),
+            id: Math.random().toString(36).substr(2, 9),
+          },
+        ]
+      : [],
     currentIndex: initialCode ? 0 : -1,
   })
 
   const [history, setHistory] = useLocalStorage<DiagramHistoryState>(storageKey, createInitialHistory())
-  
+
   // Ensure history is defined with proper defaults
   const safeHistory = history || createInitialHistory()
   let entries = safeHistory.entries || []
   let currentIndex = safeHistory.currentIndex ?? -1
-  
-  // If we have initialCode but no entries, create the initial user-code entry
+
+  // If we have initialCode but no entries, create the initial user entry
   if (initialCode && entries.length === 0) {
     const initialEntry: DiagramHistoryEntry = {
-      type: 'user-code',
+      type: 'user',
       content: initialCode,
       timestamp: Date.now(),
       id: Math.random().toString(36).substr(2, 9),
@@ -63,15 +67,12 @@ export function useDiagramHistory(
     entries = [initialEntry]
     currentIndex = 0
     // Update the history state
-    setHistory({ entries, currentIndex })
+    setHistory({entries, currentIndex})
   }
-  
-  const currentEntry = currentIndex >= 0 && entries[currentIndex] 
-    ? entries[currentIndex] 
-    : null
-  const currentDiagramCode = currentEntry?.type === 'user-code' || currentEntry?.type === 'agent-code' 
-    ? currentEntry.content 
-    : initialCode
+
+  const currentEntry = currentIndex >= 0 && entries[currentIndex] ? entries[currentIndex] : null
+  const currentDiagramCode =
+    currentEntry?.type === 'user' || currentEntry?.type === 'agent' ? currentEntry.content : initialCode
 
   const canUndo = currentIndex > 0
   const canRedo = currentIndex < entries.length - 1
@@ -83,15 +84,15 @@ export function useDiagramHistory(
     if (!canUndo || isUndoRedoRef.current) return
 
     isUndoRedoRef.current = true
-    setHistory(prev => {
+    setHistory((prev) => {
       const safePrev = prev || createInitialHistory()
       const prevIndex = safePrev.currentIndex ?? 0
       return {
         ...safePrev,
-        currentIndex: Math.max(0, prevIndex - 1)
+        currentIndex: Math.max(0, prevIndex - 1),
       }
     })
-    
+
     setTimeout(() => {
       isUndoRedoRef.current = false
     }, 0)
@@ -101,123 +102,136 @@ export function useDiagramHistory(
     if (!canRedo || isUndoRedoRef.current) return
 
     isUndoRedoRef.current = true
-    setHistory(prev => {
+    setHistory((prev) => {
       const safePrev = prev || createInitialHistory()
       const prevEntries = safePrev.entries || []
       const prevIndex = safePrev.currentIndex ?? -1
       return {
         ...safePrev,
-        currentIndex: Math.min(prevEntries.length - 1, prevIndex + 1)
+        currentIndex: Math.min(prevEntries.length - 1, prevIndex + 1),
       }
     })
-    
+
     setTimeout(() => {
       isUndoRedoRef.current = false
     }, 0)
   }, [canRedo, setHistory])
 
-  const clear = useCallback((resetToInitial: boolean = false) => {
-    if (resetToInitial && initialCode) {
-      setHistory(createInitialHistory())
-    } else {
-      setHistory({
-        entries: [],
-        currentIndex: -1,
+  const clear = useCallback(
+    (resetToInitial: boolean = false) => {
+      if (resetToInitial && initialCode) {
+        setHistory(createInitialHistory())
+      } else {
+        setHistory({
+          entries: [],
+          currentIndex: -1,
+        })
+      }
+    },
+    [setHistory, initialCode],
+  )
+
+  const addEntry = useCallback(
+    (type: DiagramHistoryEntry['type'], content: string) => {
+      if (isUndoRedoRef.current) return
+
+      setHistory((prev) => {
+        // Ensure prev has proper structure
+        const safePrev = prev || createInitialHistory()
+        const prevEntries = safePrev.entries || []
+        const prevIndex = safePrev.currentIndex ?? -1
+
+        const newEntry: DiagramHistoryEntry = {
+          type,
+          content,
+          timestamp: Date.now(),
+          id: Math.random().toString(36).substr(2, 9),
+        }
+
+        // Remove any entries after current index (like traditional undo/redo)
+        const newEntries = [...prevEntries.slice(0, prevIndex + 1), newEntry]
+
+        // Trim to max size
+        const trimmedEntries =
+          newEntries.length > MAX_HISTORY_SIZE ? newEntries.slice(newEntries.length - MAX_HISTORY_SIZE) : newEntries
+
+        return {
+          entries: trimmedEntries,
+          currentIndex: trimmedEntries.length - 1,
+        }
       })
-    }
-  }, [setHistory, initialCode])
+    },
+    [setHistory],
+  )
 
-  const addEntry = useCallback((type: DiagramHistoryEntry['type'], content: string) => {
-    if (isUndoRedoRef.current) return
+  const updateCurrentEntry = useCallback(
+    (content: string) => {
+      if (isUndoRedoRef.current) return
 
-    setHistory(prev => {
-      // Ensure prev has proper structure
-      const safePrev = prev || createInitialHistory()
-      const prevEntries = safePrev.entries || []
-      const prevIndex = safePrev.currentIndex ?? -1
-      
-      const newEntry: DiagramHistoryEntry = {
-        type,
-        content,
-        timestamp: Date.now(),
-        id: Math.random().toString(36).substr(2, 9),
-      }
+      setHistory((prev) => {
+        // Ensure prev has proper structure
+        const safePrev = prev || createInitialHistory()
+        const prevEntries = safePrev.entries || []
+        const prevIndex = safePrev.currentIndex ?? -1
 
-      // Remove any entries after current index (like traditional undo/redo)
-      const newEntries = [...prevEntries.slice(0, prevIndex + 1), newEntry]
-      
-      // Trim to max size
-      const trimmedEntries = newEntries.length > MAX_HISTORY_SIZE 
-        ? newEntries.slice(newEntries.length - MAX_HISTORY_SIZE)
-        : newEntries
+        if (prevIndex < 0 || !prevEntries[prevIndex]) return safePrev
 
-      return {
-        entries: trimmedEntries,
-        currentIndex: trimmedEntries.length - 1,
-      }
-    })
-  }, [setHistory])
+        const updatedEntries = [...prevEntries]
+        updatedEntries[prevIndex] = {
+          ...updatedEntries[prevIndex],
+          content,
+          timestamp: Date.now(),
+        }
 
-  const updateCurrentEntry = useCallback((content: string) => {
-    if (isUndoRedoRef.current) return
+        return {
+          ...safePrev,
+          entries: updatedEntries,
+        }
+      })
+    },
+    [setHistory],
+  )
 
-    setHistory(prev => {
-      // Ensure prev has proper structure
-      const safePrev = prev || createInitialHistory()
-      const prevEntries = safePrev.entries || []
-      const prevIndex = safePrev.currentIndex ?? -1
-      
-      if (prevIndex < 0 || !prevEntries[prevIndex]) return safePrev
-      
-      const updatedEntries = [...prevEntries]
-      updatedEntries[prevIndex] = {
-        ...updatedEntries[prevIndex],
-        content,
-        timestamp: Date.now(),
-      }
+  const addUserCode = useCallback(
+    (code: string) => {
+      addEntry('user', code)
+    },
+    [addEntry],
+  )
 
-      return {
-        ...safePrev,
-        entries: updatedEntries,
-      }
-    })
-  }, [setHistory])
+  const addAgentCode = useCallback(
+    (code: string, prompt: string) => {
+      if (isUndoRedoRef.current) return
 
-  const addUserCode = useCallback((code: string) => {
-    addEntry('user-code', code)
-  }, [addEntry])
+      setHistory((prev) => {
+        // Ensure prev has proper structure
+        const safePrev = prev || createInitialHistory()
+        const prevEntries = safePrev.entries || []
+        const prevIndex = safePrev.currentIndex ?? -1
 
-  const addAgentCode = useCallback((code: string, prompt: string) => {
-    if (isUndoRedoRef.current) return
+        const newEntry: DiagramHistoryEntry = {
+          type: 'agent',
+          content: code,
+          prompt: prompt,
+          timestamp: Date.now(),
+          id: Math.random().toString(36).substr(2, 9),
+        }
 
-    setHistory(prev => {
-      // Ensure prev has proper structure
-      const safePrev = prev || createInitialHistory()
-      const prevEntries = safePrev.entries || []
-      const prevIndex = safePrev.currentIndex ?? -1
-      
-      const newEntry: DiagramHistoryEntry = {
-        type: 'agent-code',
-        content: code,
-        prompt: prompt,
-        timestamp: Date.now(),
-        id: Math.random().toString(36).substr(2, 9),
-      }
+        // Remove any entries after current index (like traditional undo/redo)
+        const newEntries = [...prevEntries.slice(0, prevIndex + 1), newEntry]
 
-      // Remove any entries after current index (like traditional undo/redo)
-      const newEntries = [...prevEntries.slice(0, prevIndex + 1), newEntry]
-      
-      // Trim to max size
-      const trimmedEntries = newEntries.length > MAX_HISTORY_SIZE 
-        ? newEntries.slice(newEntries.length - MAX_HISTORY_SIZE)
-        : newEntries
+        // Trim to max size
+        const trimmedEntries =
+          newEntries.length > MAX_HISTORY_SIZE ? newEntries.slice(newEntries.length - MAX_HISTORY_SIZE) : newEntries
 
-      return {
-        entries: trimmedEntries,
-        currentIndex: trimmedEntries.length - 1,
-      }
-    })
-  }, [setHistory])
+        return {
+          entries: trimmedEntries,
+          currentIndex: trimmedEntries.length - 1,
+        }
+      })
+    },
+    [setHistory],
+  )
 
   const getCurrentDiagramCode = useCallback(() => {
     return currentDiagramCode

@@ -1,5 +1,36 @@
 import mermaid from 'mermaid'
 
+async function analyzeInput(inputValue: string): Promise<string> {
+  try {
+    const response = await fetch('http://localhost:7868/api/v1/run/2cb4deb2-6c32-480c-8b2c-14b42a3abd92?stream=false', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        input_value: inputValue,
+        output_type: 'text',
+        input_type: 'text',
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('Failed to analyze input:', response.statusText)
+      return inputValue // Return original input if analysis fails
+    }
+
+    const data = await response.json()
+
+    // Extract the analyzed text from the response
+    const analyzedText = data.outputs?.[0]?.outputs?.[0]?.results?.text?.text || inputValue
+
+    return analyzedText
+  } catch (error) {
+    console.error('Error analyzing input:', error)
+    return inputValue // Return original input if analysis fails
+  }
+}
+
 interface GenerateDiagramOptions {
   prompt: string
   currentDiagram?: string
@@ -17,7 +48,7 @@ interface GenerateDiagramResult {
 interface GenerateDiagramStreamingOptions {
   prompt: string
   currentDiagram?: string
-  history?: Array<{type: 'user-code' | 'agent-code'; content: string; prompt?: string}>
+  history?: Array<{type: 'user' | 'agent'; content: string; prompt?: string}>
   onToken?: (chunk: string, fullText: string) => void
   onDiagramUpdate?: (diagram: string) => void
   onAttempt?: (attempt: number) => void
@@ -39,10 +70,10 @@ export async function generateDiagramStreaming(
     // Add history entries if they exist
     if (history.length > 0) {
       history.forEach((entry, index) => {
-        if (entry.type === 'agent-code' && entry.prompt) {
+        if (entry.type === 'agent' && entry.prompt) {
           inputValue += `\n  <PreviousRequest>${entry.prompt}</PreviousRequest>`
           inputValue += `\n  <PreviousDiagram id="${index + 1}">${entry.content}</PreviousDiagram>`
-        } else if (entry.type === 'user-code') {
+        } else if (entry.type === 'user') {
           inputValue += `\n  <PreviousDiagram id="${index + 1}">${entry.content}</PreviousDiagram>`
         }
       })
@@ -54,10 +85,14 @@ export async function generateDiagramStreaming(
 
     inputValue += `\n<Request>${prompt}</Request>`
 
-    console.log(inputValue)
+    console.log('Original input:', inputValue)
+
+    // Analyze the input before sending to the model
+    const analyzedInput = await analyzeInput(inputValue)
+    console.log('Analyzed input:', analyzedInput)
 
     const requestBody = {
-      input_value: inputValue,
+      input_value: analyzedInput,
       output_type: 'chat',
       input_type: 'chat',
     }
@@ -170,8 +205,11 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
         inputValue += `\n<Diagnostics>${lastDiagnosticError}</Diagnostics>`
       }
 
+      // Analyze the input before sending to the model
+      const analyzedInput = await analyzeInput(inputValue)
+
       const requestBody = {
-        input_value: inputValue,
+        input_value: analyzedInput,
         output_type: 'chat',
         input_type: 'chat',
       }
