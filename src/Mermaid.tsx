@@ -1,5 +1,5 @@
 import mermaid from 'mermaid'
-import {useCallback, useEffect, useReducer, useRef} from 'react'
+import {memo, useCallback, useEffect, useReducer, useRef} from 'react'
 import {
   ClarityMinusLine,
   ClarityPlusLine,
@@ -10,7 +10,7 @@ interface MermaidDiagramProps {
   diagram: string | null | undefined
   className?: string
   id?: string
-  onError?: (error: string) => void
+  setError: (error: string | null) => void
 }
 
 type State = {
@@ -96,7 +96,12 @@ const initialState: State = {
   hasUserInteracted: false,
 }
 
-export const MermaidDiagram = ({diagram, className = '', id, onError}: MermaidDiagramProps) => {
+export const MermaidDiagram = memo(function MermaidDiagram({
+  diagram,
+  className = '',
+  id,
+  setError,
+}: MermaidDiagramProps) {
   // Ensure diagram is always a string
   const safeDiagram = diagram || ''
   const containerRef = useRef<HTMLDivElement>(null)
@@ -126,13 +131,12 @@ export const MermaidDiagram = ({diagram, className = '', id, onError}: MermaidDi
       if (!containerRef.current || !safeDiagram.trim()) return
 
       try {
-        containerRef.current.innerHTML = ''
-
         const isValid = await mermaid.parse(safeDiagram)
 
         if (!isValid) {
           throw new Error('Invalid mermaid diagram syntax')
         }
+        containerRef.current.innerHTML = ''
 
         // Render the diagram
         const {svg} = await mermaid.render(diagramId.current, safeDiagram)
@@ -181,17 +185,16 @@ export const MermaidDiagram = ({diagram, className = '', id, onError}: MermaidDi
             }
           }
         }
+        setError(null)
       } catch (error) {
         console.error('Error rendering mermaid diagram:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        if (onError) {
-          onError(errorMessage)
-        }
+        setError(errorMessage)
       }
     }
 
     renderDiagram()
-  }, [safeDiagram, state.isInitialized, state.hasUserInteracted, onError])
+  }, [safeDiagram, state.isInitialized, state.hasUserInteracted, setError])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -462,6 +465,4 @@ export const MermaidDiagram = ({diagram, className = '', id, onError}: MermaidDi
       </div>
     </div>
   )
-}
-
-export default MermaidDiagram
+})

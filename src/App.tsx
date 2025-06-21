@@ -1,18 +1,21 @@
 import {useConversation} from '@elevenlabs/react'
-import mermaid from 'mermaid'
-import {useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {generateDiagramStreaming} from './diagram'
 import {
   ClarityMicrophoneLine,
   ClarityMicrophoneMuteLine,
+  ClarityMicrophoneSolid,
   ClarityRedoLine,
   ClarityTerminalLine,
   ClarityTrashLine,
   ClarityUndoLine,
+  HumbleiconsSpinnerEarring,
+  MaterialSymbolsLightSendOutlineRounded,
 } from './icons'
 import {MermaidDiagram} from './Mermaid'
 import {useLocalStorage} from './useLocalStorage'
 import {useReducerHistory} from './useReducerHistory'
+import {cx} from 'class-variance-authority'
 
 const defaultDiagram = `graph TD
     A[User] --> B[Web Browser]
@@ -120,7 +123,6 @@ function App() {
   )
   const lastValidDiagram = useRef(savedCode)
   const isStreamingRef = useRef(false)
-  const lastErrorRef = useRef<string | null>(null)
 
   const [showDebugPanel, setShowDebugPanel] = useState(false)
 
@@ -133,65 +135,14 @@ function App() {
     },
   })
 
+  // Update currentDiagram to match code, and save valid code to localStorage
   useEffect(() => {
-    // Skip validation during streaming to prevent errors while diagram is being built
-    if (state.isStreaming) return
-
-    const validateAndUpdate = async () => {
-      if (!state.code.trim()) {
-        const errorMsg = 'Please enter a diagram'
-        if (lastErrorRef.current !== errorMsg) {
-          lastErrorRef.current = errorMsg
-          dispatch({type: 'SET_ERROR', payload: errorMsg})
-        }
-        return
-      }
-
-      try {
-        // Initialize mermaid if needed
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'dark',
-          securityLevel: 'loose',
-          fontFamily: 'inherit',
-        })
-
-        // Validate the diagram syntax
-        const isValid = await mermaid.parse(state.code)
-
-        if (isValid) {
-          // Update the current diagram and store as last valid
-          dispatch({type: 'SET_CURRENT_DIAGRAM', payload: state.code})
-          lastValidDiagram.current = state.code
-          // Clear error only if there was one before
-          if (lastErrorRef.current !== null) {
-            lastErrorRef.current = null
-            dispatch({type: 'SET_ERROR', payload: null})
-          }
-          // Save valid code to localStorage
-          setSavedCode(state.code)
-          // History is automatically managed by useReducerHistory
-          // No need to manually push to history here
-        }
-      } catch (err) {
-        // Show error but keep the last valid diagram
-        const errorMsg = err instanceof Error ? err.message : 'Invalid diagram syntax'
-        if (lastErrorRef.current !== errorMsg) {
-          lastErrorRef.current = errorMsg
-          dispatch({type: 'SET_ERROR', payload: errorMsg})
-        }
-        dispatch({type: 'SET_CURRENT_DIAGRAM', payload: lastValidDiagram.current})
-      }
+    dispatch({type: 'SET_CURRENT_DIAGRAM', payload: state.code})
+    if (state.code.trim()) {
+      setSavedCode(state.code)
+      lastValidDiagram.current = state.code
     }
-
-    validateAndUpdate()
-  }, [state.code, state.isStreaming, dispatch, setSavedCode])
-
-  // Sync saved code with current state
-  useEffect(() => {
-    setSavedCode(state.code)
-    lastValidDiagram.current = state.code
-  }, [state.code, setSavedCode])
+  }, [state.code, dispatch, setSavedCode])
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -208,6 +159,13 @@ function App() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [historyActions])
+
+  const setError = useCallback(
+    (error: string | null) => {
+      if (!state.isStreaming) dispatch({type: 'SET_ERROR', payload: error})
+    },
+    [dispatch, state.isStreaming],
+  )
 
   const handleGenerateDiagram = async (overridePrompt?: string) => {
     const currentPrompt = overridePrompt || state.prompt
@@ -237,14 +195,13 @@ function App() {
 
     if (result.success && result.diagram) {
       dispatch({type: 'SET_CODE', payload: result.diagram})
-      dispatch({type: 'SET_PROMPT', payload: ''})
       dispatch({type: 'SET_ERROR', payload: null})
-      // Save successful diagram to localStorage
-      setSavedCode(result.diagram)
-      // Dispatch will automatically create a history entry
     } else if (result.error) {
       dispatch({type: 'SET_ERROR', payload: result.error})
     }
+
+    // Always clear the prompt when generation is done (success or failure)
+    dispatch({type: 'SET_PROMPT', payload: ''})
 
     if (result.rawResponse) {
       dispatch({type: 'SET_RAW_RESPONSE', payload: result.rawResponse})
@@ -280,7 +237,7 @@ function App() {
     <div className="relative flex h-screen w-screen">
       <div className="relative flex flex-1 flex-col border-r border-neutral-700">
         {state.error && (
-          <div className="absolute top-4 right-4 left-4 rounded border border-red-900 bg-red-950 p-2 px-3 text-sm text-red-400">
+          <div className="absolute top-4 right-4 left-4 z-50 rounded border border-red-900 bg-red-950 p-2 px-3 text-sm text-red-400">
             Error: {state.error}
           </div>
         )}
@@ -288,38 +245,48 @@ function App() {
           <MermaidDiagram
             diagram={state.currentDiagram || defaultDiagram}
             className="h-full w-full"
-            onError={(error) => {
-              if (!state.isStreaming) {
-                dispatch({type: 'SET_ERROR', payload: error})
-              }
-            }}
+            setError={setError}
           />
         </div>
       </div>
 
       {/* Right side - Code editor */}
       <div className="flex flex-1 flex-col bg-neutral-900">
-        <div className="mx-4 mt-4 flex gap-2 rounded border border-neutral-700 bg-neutral-900 p-2 px-4 text-sm">
-          <input
-            type="text"
-            value={state.prompt}
-            onChange={(e) => dispatch({type: 'SET_PROMPT', payload: e.target.value})}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleGenerateDiagram()
-              }
-            }}
-            placeholder="Enter prompt to generate diagram..."
-            disabled={state.isGenerating}
-            className="flex-1 text-sm outline-none focus:border-neutral-500 disabled:opacity-50"
-          />
+        <div className="mx-4 mt-4 flex items-center justify-between gap-2">
+          <div className="flex h-8 flex-1 gap-2 rounded border border-neutral-700 bg-neutral-900 p-2">
+            <input
+              type="text"
+              value={state.prompt}
+              onChange={(e) => dispatch({type: 'SET_PROMPT', payload: e.target.value})}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleGenerateDiagram()
+                }
+              }}
+              placeholder="Enter prompt to generate diagram..."
+              className="flex-1 text-xs outline-none focus:border-neutral-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleGenerateDiagram()}
+              className={cx('text-white transition-colors', state.isGenerating && 'animate-spin')}
+              disabled={state.isGenerating}
+            >
+              {state.isGenerating && <HumbleiconsSpinnerEarring className="h-4 w-4" />}
+              {!state.isGenerating && <MaterialSymbolsLightSendOutlineRounded className="h-4 w-4" />}
+            </button>
+          </div>
           <button
             type="button"
             onClick={state.isListening ? handleStopListening : handleStartListening}
-            className="flex items-center justify-center text-sm text-white transition-colors"
+            className={cx(
+              'flex h-8 w-8 items-center justify-center rounded border p-1 text-sm text-white transition-colors',
+              state.isListening && 'border-green-700 bg-green-900',
+              !state.isListening && 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800',
+            )}
             title={state.isListening ? 'Stop Listening' : 'Start Listening'}
           >
-            {state.isListening && <ClarityMicrophoneMuteLine />}
+            {state.isListening && <ClarityMicrophoneSolid className="text-green-300" />}
             {!state.isListening && <ClarityMicrophoneLine />}
           </button>
         </div>
@@ -327,16 +294,9 @@ function App() {
         {conversationID && (
           <div className="text-xs text-neutral-500">Conversation ID: {conversationID.slice(0, 8)}...</div>
         )}
-        {state.isGenerating && (
-          <div className="mt-2 text-xs text-neutral-500">
-            {state.isStreaming
-              ? 'Streaming diagram...'
-              : `Generating diagram${state.currentAttempt > 1 ? ` (attempt ${state.currentAttempt}/5)` : ''}...`}
-          </div>
-        )}
 
         <textarea
-          value={state.code}
+          value={state.code || defaultDiagram}
           onChange={(e) => {
             const newCode = e.target.value
             // Always use overwrite mode for manual edits - this updates the current history entry
