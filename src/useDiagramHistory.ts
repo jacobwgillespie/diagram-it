@@ -20,6 +20,7 @@ interface DiagramHistoryActions {
   undo: () => void
   redo: () => void
   clear: (resetToInitial?: boolean) => void
+  prune: () => void
   addUserCode: (code: string) => void
   addAgentCode: (code: string, prompt: string) => void
   updateCurrentEntry: (content: string) => void
@@ -135,6 +136,20 @@ export function useDiagramHistory(
     [setHistory, initialCode, createInitialHistory],
   )
 
+  const prune = useCallback(() => {
+    const newEntry: DiagramHistoryEntry = {
+      type: 'user',
+      content: currentDiagramCode,
+      timestamp: Date.now(),
+      id: Math.random().toString(36).substr(2, 9),
+    }
+
+    setHistory({
+      entries: [newEntry],
+      currentIndex: 0,
+    })
+  }, [currentDiagramCode, setHistory])
+
   const addEntry = useCallback(
     (type: DiagramHistoryEntry['type'], content: string) => {
       if (isUndoRedoRef.current) return
@@ -241,17 +256,20 @@ export function useDiagramHistory(
     return currentDiagramCode
   }, [currentDiagramCode])
 
-  const goToIndex = useCallback((index: number) => {
-    if (index < 0 || index >= entries.length || index === currentIndex) return
+  const goToIndex = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= entries.length || index === currentIndex) return
 
-    setHistory((prev) => {
-      const safePrev = prev || createInitialHistory
-      return {
-        ...safePrev,
-        currentIndex: index,
-      }
-    })
-  }, [entries.length, currentIndex, setHistory, createInitialHistory])
+      setHistory((prev) => {
+        const safePrev = prev || createInitialHistory
+        return {
+          ...safePrev,
+          currentIndex: index,
+        }
+      })
+    },
+    [entries.length, currentIndex, setHistory, createInitialHistory],
+  )
 
   const historyActions: DiagramHistoryActions = {
     canUndo,
@@ -259,6 +277,7 @@ export function useDiagramHistory(
     undo,
     redo,
     clear,
+    prune,
     addUserCode,
     addAgentCode,
     updateCurrentEntry,

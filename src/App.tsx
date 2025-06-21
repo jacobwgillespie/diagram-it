@@ -1,5 +1,5 @@
 import {useConversation} from '@elevenlabs/react'
-import {useCallback, useEffect, useReducer, useRef, useState} from 'react'
+import {useCallback, useEffect, useReducer, useRef} from 'react'
 import {generateDiagramStreaming} from './diagram'
 import {HistoryEntry} from './HistoryEntry'
 import {
@@ -8,6 +8,7 @@ import {
   ClarityRedoLine,
   ClarityTrashLine,
   ClarityUndoLine,
+  F7RectangleCompressVertical,
   HumbleiconsSpinnerEarring,
   MaterialSymbolsLightSendOutlineRounded,
 } from './icons'
@@ -86,7 +87,21 @@ const createInitialState = (): State => ({
 
 export function App() {
   const [state, dispatch] = useReducer(reducer, createInitialState())
-  const [currentDiagram, diagramHistory] = useDiagramHistory(defaultDiagram, 'mermaid-diagram-history')
+
+  // Get session ID from URL search params or generate a new one
+  const getSessionId = () => {
+    const searchParams = new URLSearchParams(location.search)
+    const existingId = searchParams.get('session')
+    if (existingId) return existingId
+
+    const newId = crypto.randomUUID()
+    searchParams.set('session', newId)
+    const newUrl = `${location.pathname}?${searchParams.toString()}`
+    history.replaceState(null, '', newUrl)
+    return newId
+  }
+
+  const [currentDiagram, diagramHistory] = useDiagramHistory(defaultDiagram, getSessionId())
   const lastValidDiagram = useRef(currentDiagram)
 
   const conversation = useConversation({
@@ -109,7 +124,6 @@ export function App() {
       lastValidDiagram.current = currentDiagram
     }
   }, [currentDiagram])
-
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -266,9 +280,9 @@ export function App() {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-neutral-700 bg-neutral-950 p-4">
           <div className="space-y-1 text-xs">
             {diagramHistory.entries.map((entry, index) => (
-              <HistoryEntry 
-                key={entry.id} 
-                entry={entry} 
+              <HistoryEntry
+                key={entry.id}
+                entry={entry}
                 isCurrent={index === diagramHistory.currentIndex}
                 onClick={() => diagramHistory.goToIndex(index)}
               />
@@ -299,6 +313,17 @@ export function App() {
               title="Redo (Ctrl+Y)"
             >
               <ClarityRedoLine />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Keep current diagram and reset history
+                diagramHistory.prune()
+              }}
+              className="rounded border border-yellow-600 bg-yellow-800 px-3 py-2 text-sm text-white transition-colors hover:bg-yellow-700"
+              title="Reset History with Current Diagram"
+            >
+              <F7RectangleCompressVertical />
             </button>
             <button
               type="button"

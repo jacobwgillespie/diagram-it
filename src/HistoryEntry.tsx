@@ -22,13 +22,13 @@ export function HistoryEntry({entry, isCurrent, onClick}: HistoryEntryProps) {
   }, [isCurrent])
 
   return (
-    <div 
-      ref={entryRef} 
+    <div
+      ref={entryRef}
       className={cx(
-        'space-y-2 rounded p-4 transition-colors border',
+        'space-y-2 rounded border p-4 transition-colors',
         isCurrent ? 'border-green-700 bg-green-900/30' : 'border-transparent',
         onClick && 'cursor-pointer',
-        onClick && !isCurrent && 'hover:bg-neutral-800/50'
+        onClick && !isCurrent && 'hover:bg-neutral-800/50',
       )}
       onClick={onClick}
     >
