@@ -175,6 +175,15 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
           dispatch({type: 'SET_ORIGINAL_SVG_SIZE', payload: {width: svgWidth, height: svgHeight}})
 
+          // Extract title from rendered SVG
+          const titleElement = svgElement.querySelector('.flowchartTitleText')
+          if (titleElement?.textContent) {
+            document.title = titleElement.textContent.trim()
+          } else {
+            // Fallback to default title if no title found in SVG
+            document.title = 'Diagram It!'
+          }
+
           // Only center the diagram if user hasn't interacted yet
           if (!state.hasUserInteracted) {
             const parentContainer = containerRef.current.parentElement
@@ -216,6 +225,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
     renderDiagram()
   }, [safeDiagram, state.isInitialized, state.hasUserInteracted, setError])
+
+  // Set default title when diagram is empty
+  useEffect(() => {
+    if (!safeDiagram.trim()) {
+      document.title = 'Diagram It!'
+    }
+  }, [safeDiagram])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -290,7 +306,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   }, [state.isDragging, handleMouseMove, handleMouseUp])
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault()
       // Use smaller increments for smoother zooming (about 2.5% per scroll)
       const zoomSpeed = 0.025
@@ -371,7 +387,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     if (!container) return
 
     const wheelHandler = (e: WheelEvent) => {
-      handleWheel(e as any)
+      handleWheel(e)
     }
 
     container.addEventListener('wheel', wheelHandler, {passive: false})
@@ -403,8 +419,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
     const containerWidth = parentContainer.offsetWidth
     const containerHeight = parentContainer.offsetHeight
-    const centerX = containerWidth / 2
-    const centerY = containerHeight / 2
 
     dispatch({
       type: 'UPDATE_TRANSFORM',
@@ -427,7 +441,8 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         const availableWidth = containerWidth - padding
         const availableHeight = containerHeight - padding
 
-        let finalX, finalY
+        let finalX: number
+        let finalY: number
 
         if (scaledWidth <= availableWidth && scaledHeight <= availableHeight) {
           // Diagram fits, center it normally
@@ -466,8 +481,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
     const containerWidth = parentContainer.offsetWidth
     const containerHeight = parentContainer.offsetHeight
-    const centerX = containerWidth / 2
-    const centerY = containerHeight / 2
 
     dispatch({
       type: 'UPDATE_TRANSFORM',
@@ -487,7 +500,8 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         const availableWidth = containerWidth - padding
         const availableHeight = containerHeight - padding
 
-        let finalX, finalY
+        let finalX: number
+        let finalY: number
 
         if (scaledWidth <= availableWidth && scaledHeight <= availableHeight) {
           // Diagram fits, center it normally

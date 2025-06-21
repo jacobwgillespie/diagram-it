@@ -320,7 +320,7 @@ export function App() {
                 // Keep current diagram and reset history
                 diagramHistory.prune()
               }}
-              className="rounded border border-yellow-600 bg-yellow-800 px-3 py-2 text-sm text-white transition-colors hover:bg-yellow-700"
+              className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
               title="Reset History with Current Diagram"
             >
               <F7RectangleCompressVertical />
