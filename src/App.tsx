@@ -90,6 +90,7 @@ export function App() {
   const lastValidDiagram = useRef(currentDiagram)
 
   const conversation = useConversation({
+    agentId: AGENT_ID,
     clientTools: {
       updateDiagram: ({userRequest}: {userRequest: string}) => {
         dispatch({type: 'SET_PROMPT', payload: userRequest})
@@ -170,12 +171,7 @@ export function App() {
 
   const handleStartListening = useCallback(async () => {
     try {
-      await conversation.startSession({
-        agentId: AGENT_ID,
-        onConnect() {
-          // void conversation.setVolume({volume: 0.1})
-        },
-      })
+      await conversation.startSession()
     } catch (err) {
       dispatch({type: 'SET_ERROR', payload: err instanceof Error ? err.message : 'Failed to start conversation'})
     }
@@ -189,7 +185,7 @@ export function App() {
     }
   }, [conversation])
 
-  const conversationID = conversation.status === 'connected' ? conversation.getId() : null
+  const isConnected = conversation.status === 'connected'
 
   return (
     <div className="relative flex h-screen w-screen">
@@ -235,16 +231,16 @@ export function App() {
           </div>
           <button
             type="button"
-            onClick={conversationID ? handleStopListening : handleStartListening}
+            onClick={isConnected ? handleStopListening : handleStartListening}
             className={cx(
               'flex h-10 w-10 items-center justify-center rounded border p-1 text-sm text-white transition-colors',
-              conversationID && 'border-green-700 bg-green-900',
-              !conversationID && 'border-neutral-700 hover:border-neutral-500',
+              isConnected && 'border-green-700 bg-green-900',
+              !isConnected && 'border-neutral-700 hover:border-neutral-500',
             )}
-            title={conversationID ? 'Stop Listening' : 'Start Listening'}
+            title={isConnected ? 'Stop Listening' : 'Start Listening'}
           >
-            {conversationID && <ClarityMicrophoneSolid className="text-green-300" />}
-            {!conversationID && <ClarityMicrophoneLine />}
+            {isConnected && <ClarityMicrophoneSolid className="text-green-300" />}
+            {!isConnected && <ClarityMicrophoneLine />}
           </button>
         </div>
 
