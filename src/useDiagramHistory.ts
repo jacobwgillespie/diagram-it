@@ -1,4 +1,4 @@
-import {useCallback, useRef} from 'react'
+import {useCallback, useRef, useMemo} from 'react'
 import {useLocalStorage} from './useLocalStorage'
 
 interface DiagramHistoryEntry {
@@ -35,24 +35,27 @@ export function useDiagramHistory(
   initialCode = '',
   storageKey = 'diagram-conversation-history',
 ): [string, DiagramHistoryActions] {
-  const createInitialHistory = (): DiagramHistoryState => ({
-    entries: initialCode
-      ? [
-          {
-            type: 'user',
-            content: initialCode,
-            timestamp: Date.now(),
-            id: Math.random().toString(36).substr(2, 9),
-          },
-        ]
-      : [],
-    currentIndex: initialCode ? 0 : -1,
-  })
+  const createInitialHistory = useMemo(
+    (): DiagramHistoryState => ({
+      entries: initialCode
+        ? [
+            {
+              type: 'user',
+              content: initialCode,
+              timestamp: Date.now(),
+              id: Math.random().toString(36).substr(2, 9),
+            },
+          ]
+        : [],
+      currentIndex: initialCode ? 0 : -1,
+    }),
+    [initialCode],
+  )
 
-  const [history, setHistory] = useLocalStorage<DiagramHistoryState>(storageKey, createInitialHistory())
+  const [history, setHistory] = useLocalStorage<DiagramHistoryState>(storageKey, createInitialHistory)
 
   // Ensure history is defined with proper defaults
-  const safeHistory = history || createInitialHistory()
+  const safeHistory = history || createInitialHistory
   let entries = safeHistory.entries || []
   let currentIndex = safeHistory.currentIndex ?? -1
 
@@ -85,7 +88,7 @@ export function useDiagramHistory(
 
     isUndoRedoRef.current = true
     setHistory((prev) => {
-      const safePrev = prev || createInitialHistory()
+      const safePrev = prev || createInitialHistory
       const prevIndex = safePrev.currentIndex ?? 0
       return {
         ...safePrev,
@@ -96,14 +99,14 @@ export function useDiagramHistory(
     setTimeout(() => {
       isUndoRedoRef.current = false
     }, 0)
-  }, [canUndo, setHistory])
+  }, [canUndo, setHistory, createInitialHistory])
 
   const redo = useCallback(() => {
     if (!canRedo || isUndoRedoRef.current) return
 
     isUndoRedoRef.current = true
     setHistory((prev) => {
-      const safePrev = prev || createInitialHistory()
+      const safePrev = prev || createInitialHistory
       const prevEntries = safePrev.entries || []
       const prevIndex = safePrev.currentIndex ?? -1
       return {
@@ -115,12 +118,12 @@ export function useDiagramHistory(
     setTimeout(() => {
       isUndoRedoRef.current = false
     }, 0)
-  }, [canRedo, setHistory])
+  }, [canRedo, setHistory, createInitialHistory])
 
   const clear = useCallback(
     (resetToInitial = false) => {
       if (resetToInitial && initialCode) {
-        setHistory(createInitialHistory())
+        setHistory(createInitialHistory)
       } else {
         setHistory({
           entries: [],
@@ -128,7 +131,7 @@ export function useDiagramHistory(
         })
       }
     },
-    [setHistory, initialCode],
+    [setHistory, initialCode, createInitialHistory],
   )
 
   const addEntry = useCallback(
@@ -137,7 +140,7 @@ export function useDiagramHistory(
 
       setHistory((prev) => {
         // Ensure prev has proper structure
-        const safePrev = prev || createInitialHistory()
+        const safePrev = prev || createInitialHistory
         const prevEntries = safePrev.entries || []
         const prevIndex = safePrev.currentIndex ?? -1
 
@@ -161,7 +164,7 @@ export function useDiagramHistory(
         }
       })
     },
-    [setHistory],
+    [setHistory, createInitialHistory],
   )
 
   const updateCurrentEntry = useCallback(
@@ -170,7 +173,7 @@ export function useDiagramHistory(
 
       setHistory((prev) => {
         // Ensure prev has proper structure
-        const safePrev = prev || createInitialHistory()
+        const safePrev = prev || createInitialHistory
         const prevEntries = safePrev.entries || []
         const prevIndex = safePrev.currentIndex ?? -1
 
@@ -189,7 +192,7 @@ export function useDiagramHistory(
         }
       })
     },
-    [setHistory],
+    [setHistory, createInitialHistory],
   )
 
   const addUserCode = useCallback(
@@ -205,7 +208,7 @@ export function useDiagramHistory(
 
       setHistory((prev) => {
         // Ensure prev has proper structure
-        const safePrev = prev || createInitialHistory()
+        const safePrev = prev || createInitialHistory
         const prevEntries = safePrev.entries || []
         const prevIndex = safePrev.currentIndex ?? -1
 
@@ -230,7 +233,7 @@ export function useDiagramHistory(
         }
       })
     },
-    [setHistory],
+    [setHistory, createInitialHistory],
   )
 
   const getCurrentDiagramCode = useCallback(() => {
