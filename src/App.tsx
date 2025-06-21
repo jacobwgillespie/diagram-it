@@ -6,6 +6,7 @@ import {
   ClarityMicrophoneLine,
   ClarityMicrophoneSolid,
   ClarityRedoLine,
+  ClarityTerminalLine,
   ClarityTrashLine,
   ClarityUndoLine,
   F7RectangleCompressVertical,
@@ -291,17 +292,7 @@ export function App() {
             )}
           </div>
 
-          <div className="absolute right-2 bottom-2 left-2 z-50 flex items-center gap-2">
-            <div className="flex-1">
-              <a
-                href="https://github.com/jacobwgillespie/diagram-it"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-300"
-              >
-                Source code
-              </a>
-            </div>
+          <div className="absolute right-2 bottom-2 z-50 flex items-center gap-2">
             <div className="flex gap-2">
               <button
                 type="button"
@@ -343,6 +334,14 @@ export function App() {
               >
                 <ClarityTrashLine />
               </button>
+              <a
+                href="https://github.com/jacobwgillespie/diagram-it"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
+              >
+                <ClarityTerminalLine />
+              </a>
             </div>
           </div>
         </div>
