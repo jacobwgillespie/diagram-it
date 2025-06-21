@@ -10,7 +10,6 @@ interface GenerateDiagramOptions {
 interface GenerateDiagramResult {
   success: boolean
   diagram?: string
-  rawResponse?: string
   error?: string
   attempts?: number
 }
@@ -31,7 +30,6 @@ export async function generateDiagramStreaming(
   onAttempt?.(1)
   let fullResponse = ''
   let currentDiagramContent = ''
-  let insideDiagram = false
 
   try {
     // Build the input value with request and current diagram
@@ -85,8 +83,6 @@ export async function generateDiagramStreaming(
 
             // Check if we're entering or inside a diagram block
             if (fullResponse.includes('<Diagram>')) {
-              insideDiagram = true
-
               // Extract everything after <Diagram>
               const diagramStart = fullResponse.lastIndexOf('<Diagram>') + '<Diagram>'.length
               const diagramEnd = fullResponse.indexOf('</Diagram>', diagramStart)
@@ -97,7 +93,6 @@ export async function generateDiagramStreaming(
               } else {
                 // Complete diagram found
                 currentDiagramContent = fullResponse.substring(diagramStart, diagramEnd).trim()
-                insideDiagram = false
               }
 
               // Update the diagram in real-time if we have content
@@ -108,7 +103,6 @@ export async function generateDiagramStreaming(
           }
         } catch (parseError) {
           // Skip malformed JSON lines
-          continue
         }
       }
     }
@@ -121,17 +115,14 @@ export async function generateDiagramStreaming(
       return {
         success: true,
         diagram: finalDiagram,
-        rawResponse: fullResponse,
         attempts: 1,
       }
-    } else {
-      throw new Error('No complete diagram found in response')
     }
+    throw new Error('No complete diagram found in response')
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Failed to generate diagram',
-      rawResponse: fullResponse,
       attempts: 1,
     }
   }
@@ -144,7 +135,6 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
   let attempts = 0
   let currentDiagramToSend = currentDiagram
   let lastDiagnosticError = diagnosticError
-  let lastRawResponse = ''
 
   while (attempts < maxAttempts) {
     attempts++
@@ -187,7 +177,6 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
 
       // Extract the diagram from the response
       const messageText = data.outputs?.[0]?.outputs?.[0]?.results?.message?.text || ''
-      lastRawResponse = messageText
       const diagramMatch = messageText.match(/<Diagram>([\s\S]*?)<\/Diagram>/)
 
       if (diagramMatch?.[1]) {
@@ -210,7 +199,6 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
             return {
               success: true,
               diagram: newDiagram,
-              rawResponse: lastRawResponse,
               attempts,
             }
           }
@@ -222,13 +210,9 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
             return {
               success: false,
               error: `Failed after ${maxAttempts} attempts. Last error: ${lastDiagnosticError}`,
-              rawResponse: lastRawResponse,
               attempts,
             }
           }
-
-          // Continue to next attempt
-          continue
         }
       } else {
         throw new Error('No diagram found in API response')
@@ -237,7 +221,6 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
       return {
         success: false,
         error: err instanceof Error ? err.message : 'Failed to generate diagram',
-        rawResponse: lastRawResponse,
         attempts,
       }
     }
@@ -247,7 +230,6 @@ export async function generateDiagram(options: GenerateDiagramOptions): Promise<
   return {
     success: false,
     error: 'Maximum attempts reached',
-    rawResponse: lastRawResponse,
     attempts,
   }
 }

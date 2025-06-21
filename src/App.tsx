@@ -1,62 +1,48 @@
 import {useConversation} from '@elevenlabs/react'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useReducer, useRef} from 'react'
 import {generateDiagramStreaming} from './diagram'
+import {HistoryEntry} from './HistoryEntry'
 import {
   ClarityMicrophoneLine,
-  ClarityMicrophoneMuteLine,
   ClarityMicrophoneSolid,
   ClarityRedoLine,
-  ClarityTerminalLine,
   ClarityTrashLine,
   ClarityUndoLine,
   HumbleiconsSpinnerEarring,
   MaterialSymbolsLightSendOutlineRounded,
 } from './icons'
 import {MermaidDiagram} from './Mermaid'
-import {useLocalStorage} from './useLocalStorage'
-import {useReducerHistory} from './useReducerHistory'
+import {useDiagramHistory} from './useDiagramHistory'
 import {cx} from 'class-variance-authority'
 
 const defaultDiagram = `graph TD
     A[User] --> B[Web Browser]
-    B --> C[Web Server]
+    B --> C[Load Balancer]
     C --> D[Application Server]
     D --> E[Database]`
 
 const AGENT_ID = 'agent_01jy7dj476fchbe6bwfnc78ga0'
 
 type State = {
-  code: string
-  currentDiagram: string
   error: string | null
   prompt: string
   isGenerating: boolean
   currentAttempt: number
-  rawResponse: string
-  isListening: boolean
   isStreaming: boolean
 }
 
 type Action =
-  | {type: 'SET_CODE'; payload: string}
-  | {type: 'SET_CURRENT_DIAGRAM'; payload: string}
   | {type: 'SET_ERROR'; payload: string | null}
   | {type: 'SET_PROMPT'; payload: string}
   | {type: 'SET_IS_GENERATING'; payload: boolean}
   | {type: 'SET_CURRENT_ATTEMPT'; payload: number}
-  | {type: 'SET_RAW_RESPONSE'; payload: string}
   | {type: 'SET_IS_LISTENING'; payload: boolean}
   | {type: 'SET_IS_STREAMING'; payload: boolean}
   | {type: 'START_GENERATING'}
   | {type: 'STOP_GENERATING'}
-  | {type: 'UPDATE_DIAGRAM'; payload: {code: string; currentDiagram: string}}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'SET_CODE':
-      return {...state, code: action.payload}
-    case 'SET_CURRENT_DIAGRAM':
-      return {...state, currentDiagram: action.payload}
     case 'SET_ERROR':
       // Only update if the error has actually changed
       if (state.error === action.payload) {
@@ -69,10 +55,6 @@ function reducer(state: State, action: Action): State {
       return {...state, isGenerating: action.payload}
     case 'SET_CURRENT_ATTEMPT':
       return {...state, currentAttempt: action.payload}
-    case 'SET_RAW_RESPONSE':
-      return {...state, rawResponse: action.payload}
-    case 'SET_IS_LISTENING':
-      return {...state, isListening: action.payload}
     case 'SET_IS_STREAMING':
       return {...state, isStreaming: action.payload}
     case 'START_GENERATING':
@@ -82,7 +64,6 @@ function reducer(state: State, action: Action): State {
         isStreaming: true,
         error: null,
         currentAttempt: 0,
-        rawResponse: '',
       }
     case 'STOP_GENERATING':
       return {
@@ -91,40 +72,23 @@ function reducer(state: State, action: Action): State {
         isStreaming: false,
         currentAttempt: 0,
       }
-    case 'UPDATE_DIAGRAM':
-      return {
-        ...state,
-        code: action.payload.code,
-        currentDiagram: action.payload.currentDiagram,
-      }
     default:
       return state
   }
 }
 
-const createInitialState = (savedCode: string): State => ({
-  code: savedCode,
-  currentDiagram: savedCode,
+const createInitialState = (): State => ({
   error: null,
   prompt: '',
   isGenerating: false,
   currentAttempt: 0,
-  rawResponse: '',
-  isListening: false,
   isStreaming: false,
 })
 
-function App() {
-  const [savedCode, setSavedCode] = useLocalStorage('mermaid-diagram-code', defaultDiagram)
-  const [state, dispatch, historyActions] = useReducerHistory(
-    reducer,
-    createInitialState(savedCode),
-    'mermaid-app-history',
-  )
-  const lastValidDiagram = useRef(savedCode)
-  const isStreamingRef = useRef(false)
-
-  const [showDebugPanel, setShowDebugPanel] = useState(false)
+export function App() {
+  const [state, dispatch] = useReducer(reducer, createInitialState())
+  const [currentDiagram, diagramHistory] = useDiagramHistory(defaultDiagram, 'mermaid-diagram-history')
+  const lastValidDiagram = useRef(currentDiagram)
 
   const conversation = useConversation({
     clientTools: {
@@ -135,36 +99,34 @@ function App() {
     },
   })
 
-  // Update currentDiagram to match code, and save valid code to localStorage
+  // Update lastValidDiagram ref when currentDiagram changes
   useEffect(() => {
-    dispatch({type: 'SET_CURRENT_DIAGRAM', payload: state.code})
-    if (state.code.trim()) {
-      setSavedCode(state.code)
-      lastValidDiagram.current = state.code
+    if (currentDiagram.trim()) {
+      lastValidDiagram.current = currentDiagram
     }
-  }, [state.code, dispatch, setSavedCode])
+  }, [currentDiagram])
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault()
-        historyActions.undo()
+        diagramHistory.undo()
       } else if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === 'Z') || e.key === 'y')) {
         e.preventDefault()
-        historyActions.redo()
+        diagramHistory.redo()
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [historyActions])
+  }, [diagramHistory])
 
   const setError = useCallback(
     (error: string | null) => {
       if (!state.isStreaming) dispatch({type: 'SET_ERROR', payload: error})
     },
-    [dispatch, state.isStreaming],
+    [state.isStreaming],
   )
 
   const handleGenerateDiagram = async (overridePrompt?: string) => {
@@ -172,29 +134,29 @@ function App() {
     if (!currentPrompt.trim() || state.isGenerating) return
 
     dispatch({type: 'START_GENERATING'})
-    isStreamingRef.current = true
 
     // Use the most recent valid diagram as the base
     const baselineCode = lastValidDiagram.current
+
+    // Create agent code entry with prompt and current diagram as starting point
+    diagramHistory.addAgentCode(baselineCode, currentPrompt)
 
     const result = await generateDiagramStreaming({
       prompt: currentPrompt,
       currentDiagram: baselineCode,
       onAttempt: (attempt) => dispatch({type: 'SET_CURRENT_ATTEMPT', payload: attempt}),
-      onToken: (_chunk, fullText) => {
-        dispatch({type: 'SET_RAW_RESPONSE', payload: fullText})
-      },
+      onToken: (_chunk, _fullText) => {},
       onDiagramUpdate: (diagram) => {
-        // Update code in real-time as diagram tokens arrive
-        dispatch({type: 'UPDATE_DIAGRAM', payload: {code: diagram, currentDiagram: diagram}})
+        // Update the agent code entry as new content streams in
+        diagramHistory.updateCurrentEntry(diagram)
       },
     })
 
     dispatch({type: 'SET_IS_STREAMING', payload: false})
-    isStreamingRef.current = false
 
     if (result.success && result.diagram) {
-      dispatch({type: 'SET_CODE', payload: result.diagram})
+      // Final update to ensure we have the complete diagram
+      diagramHistory.updateCurrentEntry(result.diagram)
       dispatch({type: 'SET_ERROR', payload: null})
     } else if (result.error) {
       dispatch({type: 'SET_ERROR', payload: result.error})
@@ -202,11 +164,6 @@ function App() {
 
     // Always clear the prompt when generation is done (success or failure)
     dispatch({type: 'SET_PROMPT', payload: ''})
-
-    if (result.rawResponse) {
-      dispatch({type: 'SET_RAW_RESPONSE', payload: result.rawResponse})
-    }
-
     dispatch({type: 'STOP_GENERATING'})
   }
 
@@ -231,7 +188,7 @@ function App() {
     }
   }
 
-  const conversationID = conversation.getId()
+  const conversationID = conversation.status === 'connected' ? conversation.getId() : null
 
   return (
     <div className="relative flex h-screen w-screen">
@@ -242,16 +199,12 @@ function App() {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <MermaidDiagram
-            diagram={state.currentDiagram || defaultDiagram}
-            className="h-full w-full"
-            setError={setError}
-          />
+          <MermaidDiagram diagram={currentDiagram || defaultDiagram} className="h-full w-full" setError={setError} />
         </div>
       </div>
 
       {/* Right side - Code editor */}
-      <div className="flex flex-1 flex-col bg-neutral-900">
+      <div className="flex min-w-0 flex-1 flex-col bg-neutral-900">
         <div className="mx-4 mt-4 flex items-center justify-between gap-2">
           <div className="flex h-8 flex-1 gap-2 rounded border border-neutral-700 bg-neutral-900 p-2">
             <input
@@ -278,42 +231,55 @@ function App() {
           </div>
           <button
             type="button"
-            onClick={state.isListening ? handleStopListening : handleStartListening}
+            onClick={conversationID ? handleStopListening : handleStartListening}
             className={cx(
               'flex h-8 w-8 items-center justify-center rounded border p-1 text-sm text-white transition-colors',
-              state.isListening && 'border-green-700 bg-green-900',
-              !state.isListening && 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800',
+              conversationID && 'border-green-700 bg-green-900',
+              !conversationID && 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800',
             )}
-            title={state.isListening ? 'Stop Listening' : 'Start Listening'}
+            title={conversationID ? 'Stop Listening' : 'Start Listening'}
           >
-            {state.isListening && <ClarityMicrophoneSolid className="text-green-300" />}
-            {!state.isListening && <ClarityMicrophoneLine />}
+            {conversationID && <ClarityMicrophoneSolid className="text-green-300" />}
+            {!conversationID && <ClarityMicrophoneLine />}
           </button>
         </div>
 
-        {conversationID && (
-          <div className="text-xs text-neutral-500">Conversation ID: {conversationID.slice(0, 8)}...</div>
-        )}
-
         <textarea
-          value={state.code || defaultDiagram}
+          value={currentDiagram || defaultDiagram}
           onChange={(e) => {
             const newCode = e.target.value
-            // Always use overwrite mode for manual edits - this updates the current history entry
-            dispatch({type: 'SET_CODE', payload: newCode}, 'overwrite')
+            // Update current entry or create new user-code entry
+            if (
+              diagramHistory.entries.length === 0 ||
+              diagramHistory.entries[diagramHistory.currentIndex]?.type !== 'user-code'
+            ) {
+              diagramHistory.addUserCode(newCode)
+            } else {
+              diagramHistory.updateCurrentEntry(newCode)
+            }
           }}
           className="flex-1 resize-none bg-neutral-900 p-4 text-sm text-white outline-none"
           placeholder="Enter your Mermaid diagram code here..."
         />
 
-        {/* Action buttons */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-neutral-950 p-4">
+          <div className="space-y-1 text-xs">
+            {diagramHistory.entries.map((entry, index) => (
+              <HistoryEntry key={entry.id} entry={entry} isCurrent={index === diagramHistory.currentIndex} />
+            ))}
+
+            {diagramHistory.entries.length === 0 && (
+              <div className="py-4 text-center text-neutral-500">No conversation history</div>
+            )}
+          </div>
+        </div>
+
         <div className="fixed right-4 bottom-4 z-50 flex flex-col gap-2">
-          {/* History controls */}
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={historyActions.undo}
-              disabled={!historyActions.canUndo}
+              onClick={diagramHistory.undo}
+              disabled={!diagramHistory.canUndo}
               className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
               title="Undo (Ctrl+Z)"
             >
@@ -321,8 +287,8 @@ function App() {
             </button>
             <button
               type="button"
-              onClick={historyActions.redo}
-              disabled={!historyActions.canRedo}
+              onClick={diagramHistory.redo}
+              disabled={!diagramHistory.canRedo}
               className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
               title="Redo (Ctrl+Y)"
             >
@@ -332,116 +298,16 @@ function App() {
               type="button"
               onClick={() => {
                 // Clear history and reset to empty state
-                const emptyState = createInitialState('')
-                historyActions.clear(emptyState)
+                diagramHistory.clear()
               }}
               className="rounded border border-red-600 bg-red-800 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
               title="Clear History and Reset"
             >
               <ClarityTrashLine />
             </button>
-
-            <button
-              type="button"
-              onClick={() => setShowDebugPanel(!showDebugPanel)}
-              className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700"
-              title="Toggle Debug Panel"
-            >
-              <ClarityTerminalLine />
-            </button>
-          </div>
-        </div>
-
-        {/* Slide-up debug panel */}
-        <div
-          className={`fixed inset-x-0 bottom-0 z-40 border-t border-neutral-700 bg-neutral-900 transition-transform duration-300 ease-in-out ${
-            showDebugPanel ? 'translate-y-0' : 'translate-y-full'
-          }`}
-          style={{maxHeight: '50vh'}}
-        >
-          <div className="flex h-full flex-col p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold text-white">Debug Panel</h3>
-              <button
-                type="button"
-                onClick={() => setShowDebugPanel(false)}
-                className="text-neutral-400 transition-colors hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex h-full gap-4">
-              {/* History Panel */}
-              <div className="flex flex-1 flex-col">
-                <h4 className="mb-2 text-sm font-medium text-white">
-                  History ({historyActions.past.length + 1 + historyActions.future.length} entries)
-                </h4>
-                <div className="flex-1 overflow-y-auto rounded border border-neutral-800 bg-black p-2">
-                  <div className="space-y-1 text-xs">
-                    {/* Past states */}
-                    {historyActions.past.map((entry, index) => (
-                      <div key={`past-${index}`} className="rounded p-1 text-neutral-400">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-neutral-500">{index + 1}.</span>
-                          <span className="font-mono text-xs">{new Date(entry.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                        <div className="text-yellow-400">{JSON.stringify(entry.action).slice(0, 50)}...</div>
-                        <div className="truncate text-neutral-500">{entry.state.code.slice(0, 80)}...</div>
-                      </div>
-                    ))}
-
-                    {/* Current state */}
-                    <div className="rounded border border-blue-700 bg-blue-900/30 p-1 text-blue-300">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-blue-400">
-                          {historyActions.past.length + 1}. CURRENT
-                        </span>
-                        <span className="font-mono text-xs">
-                          {new Date(historyActions.present.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <div className="text-blue-300">
-                        {JSON.stringify(historyActions.present.action).slice(0, 50)}...
-                      </div>
-                      <div className="truncate text-blue-200">{historyActions.present.state.code.slice(0, 80)}...</div>
-                    </div>
-
-                    {/* Future states */}
-                    {historyActions.future.map((entry, index) => (
-                      <div key={`future-${index}`} className="rounded p-1 text-neutral-600">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-neutral-600">{historyActions.past.length + 2 + index}.</span>
-                          <span className="font-mono text-xs">{new Date(entry.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                        <div className="text-neutral-600">{JSON.stringify(entry.action).slice(0, 50)}...</div>
-                        <div className="truncate text-neutral-600">{entry.state.code.slice(0, 80)}...</div>
-                      </div>
-                    ))}
-
-                    {historyActions.past.length === 0 && historyActions.future.length === 0 && (
-                      <div className="py-4 text-center text-neutral-500">No history entries</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Model Response Panel */}
-              <div className="flex flex-1 flex-col">
-                <h4 className="mb-2 text-sm font-medium text-white">Model Response</h4>
-                <textarea
-                  value={state.rawResponse}
-                  readOnly
-                  className="flex-1 resize-none rounded border border-neutral-800 bg-black p-3 font-mono text-xs text-neutral-500 outline-none"
-                  placeholder="Model response will appear here..."
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>
     </div>
   )
 }
-
-export default App

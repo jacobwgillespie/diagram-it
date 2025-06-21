@@ -5,7 +5,7 @@ interface ContainerSize {
   height: number
 }
 
-export function useContainerSize(): [React.RefObject<HTMLElement>, ContainerSize] {
+export function useContainerSize(): [React.RefObject<HTMLElement | null>, ContainerSize] {
   const ref = useRef<HTMLElement>(null)
   const [size, setSize] = useState<ContainerSize>({width: 0, height: 0})
 
