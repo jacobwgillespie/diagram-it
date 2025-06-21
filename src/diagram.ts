@@ -17,6 +17,7 @@ interface GenerateDiagramResult {
 interface GenerateDiagramStreamingOptions {
   prompt: string
   currentDiagram?: string
+  history?: Array<{type: 'user-code' | 'agent-code'; content: string; prompt?: string}>
   onToken?: (chunk: string, fullText: string) => void
   onDiagramUpdate?: (diagram: string) => void
   onAttempt?: (attempt: number) => void
@@ -25,7 +26,7 @@ interface GenerateDiagramStreamingOptions {
 export async function generateDiagramStreaming(
   options: GenerateDiagramStreamingOptions,
 ): Promise<GenerateDiagramResult> {
-  const {prompt, currentDiagram = '', onToken, onDiagramUpdate, onAttempt} = options
+  const {prompt, currentDiagram = '', history = [], onToken, onDiagramUpdate, onAttempt} = options
 
   onAttempt?.(1)
   let fullResponse = ''
@@ -33,11 +34,31 @@ export async function generateDiagramStreaming(
 
   try {
     // Build the input value with request and current diagram
-    let inputValue = `<Request>${prompt}</Request>`
+    let inputValue = ''
+
+    // Add history entries if they exist
+    if (history.length > 0) {
+      inputValue += '\n<History>'
+
+      history.forEach((entry, index) => {
+        if (entry.type === 'agent-code' && entry.prompt) {
+          inputValue += `\n  <PreviousRequest>${entry.prompt}</PreviousRequest>`
+          inputValue += `\n  <PreviousDiagram id="${index + 1}">${entry.content}</PreviousDiagram>`
+        } else if (entry.type === 'user-code') {
+          inputValue += `\n  <PreviousDiagram id="${index + 1}">${entry.content}</PreviousDiagram>`
+        }
+      })
+
+      inputValue += '\n</History>'
+    }
+
+    inputValue += `\n<Request>${prompt}</Request>`
 
     if (currentDiagram.trim()) {
-      inputValue += `\n<Diagram>${currentDiagram}</Diagram>`
+      inputValue += `\n<CurrentDiagram>${currentDiagram}</CurrentDiagram>`
     }
+
+    console.log(inputValue)
 
     const requestBody = {
       input_value: inputValue,

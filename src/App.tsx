@@ -112,7 +112,7 @@ export function App() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault()
         diagramHistory.undo()
-      } else if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === 'Z') || e.key === 'y')) {
+      } else if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && (e.key === 'Z' || e.key === 'z')) || e.key === 'y')) {
         e.preventDefault()
         diagramHistory.redo()
       }
@@ -144,6 +144,7 @@ export function App() {
     const result = await generateDiagramStreaming({
       prompt: currentPrompt,
       currentDiagram: baselineCode,
+      history: diagramHistory.entries.slice(0, diagramHistory.currentIndex),
       onAttempt: (attempt) => dispatch({type: 'SET_CURRENT_ATTEMPT', payload: attempt}),
       onToken: (_chunk, _fullText) => {},
       onDiagramUpdate: (diagram) => {
