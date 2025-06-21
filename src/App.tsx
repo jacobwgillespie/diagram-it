@@ -170,7 +170,12 @@ export function App() {
   const handleStartListening = async () => {
     try {
       dispatch({type: 'SET_IS_LISTENING', payload: true})
-      await conversation.startSession({agentId: AGENT_ID})
+      await conversation.startSession({
+        agentId: AGENT_ID,
+        onConnect() {
+          conversation.setVolume({volume: 0})
+        },
+      })
     } catch (err) {
       dispatch({type: 'SET_ERROR', payload: err instanceof Error ? err.message : 'Failed to start conversation'})
       dispatch({type: 'SET_IS_LISTENING', payload: false})
@@ -206,7 +211,7 @@ export function App() {
       {/* Right side - Code editor */}
       <div className="flex min-w-0 flex-1 flex-col bg-neutral-900">
         <div className="mx-4 mt-4 flex items-center justify-between gap-2">
-          <div className="flex h-8 flex-1 gap-2 rounded border border-neutral-700 bg-neutral-900 p-2">
+          <div className="relative h-10 flex-1">
             <input
               type="text"
               value={state.prompt}
@@ -216,13 +221,16 @@ export function App() {
                   handleGenerateDiagram()
                 }
               }}
-              placeholder="Enter prompt to generate diagram..."
-              className="flex-1 text-xs outline-none focus:border-neutral-500"
+              placeholder="Enter prompt..."
+              className="h-10 w-full rounded border border-neutral-700 bg-neutral-900 p-2 text-sm outline-none focus:border-neutral-500"
             />
             <button
               type="button"
               onClick={() => handleGenerateDiagram()}
-              className={cx('text-white transition-colors', state.isGenerating && 'animate-spin')}
+              className={cx(
+                'absolute top-0 right-2 h-10 text-white transition-colors',
+                state.isGenerating && 'animate-spin',
+              )}
               disabled={state.isGenerating}
             >
               {state.isGenerating && <HumbleiconsSpinnerEarring className="h-4 w-4" />}
@@ -233,9 +241,9 @@ export function App() {
             type="button"
             onClick={conversationID ? handleStopListening : handleStartListening}
             className={cx(
-              'flex h-8 w-8 items-center justify-center rounded border p-1 text-sm text-white transition-colors',
+              'flex h-10 w-10 items-center justify-center rounded border p-1 text-sm text-white transition-colors',
               conversationID && 'border-green-700 bg-green-900',
-              !conversationID && 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800',
+              !conversationID && 'border-neutral-700 hover:border-neutral-500',
             )}
             title={conversationID ? 'Stop Listening' : 'Start Listening'}
           >
@@ -262,7 +270,7 @@ export function App() {
           placeholder="Enter your Mermaid diagram code here..."
         />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-neutral-950 p-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-neutral-700 bg-neutral-950 p-4">
           <div className="space-y-1 text-xs">
             {diagramHistory.entries.map((entry, index) => (
               <HistoryEntry key={entry.id} entry={entry} isCurrent={index === diagramHistory.currentIndex} />

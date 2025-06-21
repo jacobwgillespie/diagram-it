@@ -21,9 +21,9 @@ export function HistoryEntry({entry, isCurrent}: HistoryEntryProps) {
   }, [isCurrent])
 
   return (
-    <div ref={entryRef} className={cx('space-y-2 rounded p-4', isCurrent && 'border border-blue-700 bg-blue-900/30')}>
+    <div ref={entryRef} className={cx('space-y-2 rounded p-4', isCurrent && 'border border-green-700 bg-green-900/30')}>
       <div className="flex items-center justify-between gap-2">
-        <div className={cx('text-xs font-medium', entry.type === 'user-code' ? 'text-blue-400' : 'text-purple-400')}>
+        <div className={cx('text-xs font-medium', entry.type === 'user-code' ? 'text-green-400' : 'text-purple-400')}>
           {entry.type.toUpperCase().replace('-', ' ')}
         </div>
         {entry.type === 'agent-code' && entry.prompt && (
@@ -31,7 +31,7 @@ export function HistoryEntry({entry, isCurrent}: HistoryEntryProps) {
         )}
         <div className="font-mono text-xs text-neutral-500">{new Date(entry.timestamp).toLocaleTimeString()}</div>
       </div>
-      <div className={cx('truncate text-xs', isCurrent ? 'text-blue-200' : 'text-neutral-400')}>
+      <div className={cx('truncate text-xs', isCurrent ? 'text-green-200' : 'text-neutral-400')}>
         {entry.content.trim() || '...'}
       </div>
     </div>
