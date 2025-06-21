@@ -128,7 +128,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     if (!state.isInitialized) return
 
     const renderDiagram = async () => {
-      if (!containerRef.current || !safeDiagram.trim()) return
+      if (!containerRef.current) return
+      
+      // Clear container if diagram is empty
+      if (!safeDiagram.trim()) {
+        containerRef.current.innerHTML = ''
+        return
+      }
 
       try {
         const isValid = await mermaid.parse(safeDiagram)
@@ -406,6 +412,35 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     })
   }, [state.originalSvgSize])
 
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!containerRef.current || state.originalSvgSize.width === 0) return
+
+      const rect = containerRef.current.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      dispatch({
+        type: 'UPDATE_TRANSFORM',
+        payload: (prev) => {
+          const zoomFactor = 1.5 // 50% zoom in on double-click
+          const newScale = Math.min(5, prev.scale * zoomFactor) // Max 500% zoom
+
+          if (newScale === prev.scale) return prev
+
+          const scaleRatio = newScale / prev.scale
+
+          // Zoom towards the clicked point
+          const newX = mouseX - (mouseX - prev.x) * scaleRatio
+          const newY = mouseY - (mouseY - prev.y) * scaleRatio
+
+          return {x: newX, y: newY, scale: newScale}
+        },
+      })
+    },
+    [state.originalSvgSize],
+  )
+
   if (!state.isInitialized) {
     return <div className={className}>Loading diagram...</div>
   }
@@ -421,6 +456,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       }}
       onMouseDown={handleMouseDown}
       onWheel={handleWheel}
+      onDoubleClick={handleDoubleClick}
     >
       <div
         ref={containerRef}
@@ -435,34 +471,36 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         }}
       />
 
-      <div className="absolute right-2 bottom-2 left-2 flex justify-between gap-2">
-        <div className="flex gap-2">
+      {safeDiagram.trim() && (
+        <div className="absolute right-2 bottom-2 left-2 flex justify-between gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={zoomIn}
+              className="h-8 w-8 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-white hover:border-neutral-500"
+              title="Zoom In"
+            >
+              <ClarityPlusLine />
+            </button>
+            <button
+              type="button"
+              onClick={zoomOut}
+              className="h-8 w-8 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-white hover:border-neutral-500"
+              title="Zoom Out"
+            >
+              <ClarityMinusLine />
+            </button>
+          </div>
+
           <button
             type="button"
-            onClick={zoomIn}
+            onClick={resetView}
             className="h-8 w-8 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-white hover:border-neutral-500"
-            title="Zoom In"
           >
-            <ClarityPlusLine />
-          </button>
-          <button
-            type="button"
-            onClick={zoomOut}
-            className="h-8 w-8 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-white hover:border-neutral-500"
-            title="Zoom Out"
-          >
-            <ClarityMinusLine />
+            <StreamlineInterfacePageControllerFitScreenFitScreenAdjustDisplayArtboardFrameCorner />
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={resetView}
-          className="h-8 w-8 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-white hover:border-neutral-500"
-        >
-          <StreamlineInterfacePageControllerFitScreenFitScreenAdjustDisplayArtboardFrameCorner />
-        </button>
-      </div>
+      )}
     </div>
   )
 })

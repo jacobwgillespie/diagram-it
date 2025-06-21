@@ -201,7 +201,7 @@ export function App() {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <MermaidDiagram diagram={currentDiagram || defaultDiagram} className="h-full w-full" setError={setError} />
+          <MermaidDiagram diagram={currentDiagram} className="h-full w-full" setError={setError} />
         </div>
       </div>
 
@@ -250,13 +250,13 @@ export function App() {
         </div>
 
         <textarea
-          value={currentDiagram || defaultDiagram}
+          value={currentDiagram}
           onChange={(e) => {
             const newCode = e.target.value
-            // Update current entry or create new user-code entry
+            // Update current entry or create new user entry
             if (
               diagramHistory.entries.length === 0 ||
-              diagramHistory.entries[diagramHistory.currentIndex]?.type !== 'user-code'
+              diagramHistory.entries[diagramHistory.currentIndex]?.type !== 'user'
             ) {
               diagramHistory.addUserCode(newCode)
             } else {

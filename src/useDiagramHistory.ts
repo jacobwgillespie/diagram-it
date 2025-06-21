@@ -32,8 +32,8 @@ interface DiagramHistoryActions {
 const MAX_HISTORY_SIZE = 100
 
 export function useDiagramHistory(
-  initialCode: string = '',
-  storageKey: string = 'diagram-conversation-history',
+  initialCode = '',
+  storageKey = 'diagram-conversation-history',
 ): [string, DiagramHistoryActions] {
   const createInitialHistory = (): DiagramHistoryState => ({
     entries: initialCode
@@ -118,7 +118,7 @@ export function useDiagramHistory(
   }, [canRedo, setHistory])
 
   const clear = useCallback(
-    (resetToInitial: boolean = false) => {
+    (resetToInitial = false) => {
       if (resetToInitial && initialCode) {
         setHistory(createInitialHistory())
       } else {
