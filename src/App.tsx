@@ -152,8 +152,8 @@ export function App() {
 
     dispatch({type: 'START_GENERATING'})
 
-    // Use the most recent valid diagram as the base
-    const baselineCode = lastValidDiagram.current
+    // Use the most recent valid diagram as the base, or empty if current diagram is empty
+    const baselineCode = currentDiagram.trim() ? lastValidDiagram.current : ''
 
     // Create agent code entry with prompt and current diagram as starting point
     diagramHistory.addAgentCode(baselineCode, currentPrompt)
@@ -214,7 +214,7 @@ export function App() {
       </div>
 
       {/* Right side - Code editor */}
-      <div className="flex min-w-0 flex-1 flex-col bg-neutral-900">
+      <div className="relative flex min-w-0 flex-1 flex-col bg-neutral-900">
         <div className="mx-4 mt-4 flex items-center justify-between gap-2">
           <div className="relative h-10 flex-1">
             <input
@@ -290,50 +290,60 @@ export function App() {
               <div className="py-4 text-center text-neutral-500">No conversation history</div>
             )}
           </div>
-        </div>
 
-        <div className="fixed right-4 bottom-4 z-50 flex flex-col gap-2">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={diagramHistory.undo}
-              disabled={!diagramHistory.canUndo}
-              className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
-              title="Undo (Ctrl+Z)"
-            >
-              <ClarityUndoLine />
-            </button>
-            <button
-              type="button"
-              onClick={diagramHistory.redo}
-              disabled={!diagramHistory.canRedo}
-              className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
-              title="Redo (Ctrl+Y)"
-            >
-              <ClarityRedoLine />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // Keep current diagram and reset history
-                diagramHistory.prune()
-              }}
-              className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
-              title="Reset History with Current Diagram"
-            >
-              <F7RectangleCompressVertical />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // Clear history and reset to empty state
-                diagramHistory.clear()
-              }}
-              className="rounded border border-red-600 bg-red-800 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
-              title="Clear History and Reset"
-            >
-              <ClarityTrashLine />
-            </button>
+          <div className="absolute right-2 bottom-2 left-2 z-50 flex items-center gap-2">
+            <div className="flex-1">
+              <a
+                href="https://github.com/jacobwgillespie/diagram-it"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-300"
+              >
+                Source code
+              </a>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={diagramHistory.undo}
+                disabled={!diagramHistory.canUndo}
+                className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
+                title="Undo (Ctrl+Z)"
+              >
+                <ClarityUndoLine />
+              </button>
+              <button
+                type="button"
+                onClick={diagramHistory.redo}
+                disabled={!diagramHistory.canRedo}
+                className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
+                title="Redo (Ctrl+Y)"
+              >
+                <ClarityRedoLine />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Keep current diagram and reset history
+                  diagramHistory.prune()
+                }}
+                className="rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50"
+                title="Reset History with Current Diagram"
+              >
+                <F7RectangleCompressVertical />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Clear history and reset to empty state
+                  diagramHistory.clear()
+                }}
+                className="rounded border border-red-600 bg-red-800 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                title="Clear History and Reset"
+              >
+                <ClarityTrashLine />
+              </button>
+            </div>
           </div>
         </div>
       </div>

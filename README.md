@@ -18,3 +18,18 @@ flowchart TD
     Input -->|Request| DiagramAgent
     DiagramAgent[Diagram Agent] -->|Diagram| Output
 ```
+
+http://localhost:5173/#384e767c-a8ec-40c3-a00f-8deabf689142
+
+```mermaid
+---
+title: Voice agent architecture
+---
+
+flowchart TD
+    Voice[Voice Agent] -->|update diagram| 11SDK[ElevenLabs SDK]
+    Voice[Voice Agent] -->|reset diagram| 11SDK
+    11SDK -->|update diagram| DiagramAgent[Diagram Agent]
+    11SDK -->|reset diagram| React[React app]
+
+```
