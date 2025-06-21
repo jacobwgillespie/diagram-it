@@ -38,8 +38,6 @@ export async function generateDiagramStreaming(
 
     // Add history entries if they exist
     if (history.length > 0) {
-      inputValue += '\n<History>'
-
       history.forEach((entry, index) => {
         if (entry.type === 'agent-code' && entry.prompt) {
           inputValue += `\n  <PreviousRequest>${entry.prompt}</PreviousRequest>`
@@ -48,15 +46,13 @@ export async function generateDiagramStreaming(
           inputValue += `\n  <PreviousDiagram id="${index + 1}">${entry.content}</PreviousDiagram>`
         }
       })
-
-      inputValue += '\n</History>'
     }
-
-    inputValue += `\n<Request>${prompt}</Request>`
 
     if (currentDiagram.trim()) {
       inputValue += `\n<CurrentDiagram>${currentDiagram}</CurrentDiagram>`
     }
+
+    inputValue += `\n<Request>${prompt}</Request>`
 
     console.log(inputValue)
 
@@ -96,6 +92,7 @@ export async function generateDiagramStreaming(
       for (const line of lines) {
         try {
           const event = JSON.parse(line)
+          console.log('event', event)
 
           if (event.event === 'token' && event.data?.chunk) {
             const tokenChunk = event.data.chunk

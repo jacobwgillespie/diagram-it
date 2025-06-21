@@ -36,7 +36,6 @@ type Action =
   | {type: 'SET_PROMPT'; payload: string}
   | {type: 'SET_IS_GENERATING'; payload: boolean}
   | {type: 'SET_CURRENT_ATTEMPT'; payload: number}
-  | {type: 'SET_IS_LISTENING'; payload: boolean}
   | {type: 'SET_IS_STREAMING'; payload: boolean}
   | {type: 'START_GENERATING'}
   | {type: 'STOP_GENERATING'}
@@ -44,6 +43,7 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_ERROR':
+      console.log('SET_ERROR', action.payload)
       // Only update if the error has actually changed
       if (state.error === action.payload) {
         return state // No change, return same state to prevent unnecessary re-renders
@@ -95,6 +95,10 @@ export function App() {
       updateDiagram: ({userRequest}: {userRequest: string}) => {
         dispatch({type: 'SET_PROMPT', payload: userRequest})
         handleGenerateDiagram(userRequest)
+      },
+
+      resetDiagram: () => {
+        diagramHistory.clear()
       },
     },
   })
@@ -148,7 +152,6 @@ export function App() {
       onAttempt: (attempt) => dispatch({type: 'SET_CURRENT_ATTEMPT', payload: attempt}),
       onToken: (_chunk, _fullText) => {},
       onDiagramUpdate: (diagram) => {
-        // Update the agent code entry as new content streams in
         diagramHistory.updateCurrentEntry(diagram)
       },
     })
@@ -156,43 +159,36 @@ export function App() {
     dispatch({type: 'SET_IS_STREAMING', payload: false})
 
     if (result.success && result.diagram) {
-      // Final update to ensure we have the complete diagram
       diagramHistory.updateCurrentEntry(result.diagram)
       dispatch({type: 'SET_ERROR', payload: null})
     } else if (result.error) {
       dispatch({type: 'SET_ERROR', payload: result.error})
     }
 
-    // Always clear the prompt when generation is done (success or failure)
     dispatch({type: 'SET_PROMPT', payload: ''})
     dispatch({type: 'STOP_GENERATING'})
   }
 
-  const handleStartListening = async () => {
+  const handleStartListening = useCallback(async () => {
     try {
-      dispatch({type: 'SET_IS_LISTENING', payload: true})
       await conversation.startSession({
         agentId: AGENT_ID,
         onConnect() {
-          conversation.setVolume({volume: 0})
+          void conversation.setVolume({volume: 0.1})
         },
       })
     } catch (err) {
       dispatch({type: 'SET_ERROR', payload: err instanceof Error ? err.message : 'Failed to start conversation'})
-      dispatch({type: 'SET_IS_LISTENING', payload: false})
     }
-  }
+  }, [conversation])
 
-  const handleStopListening = async () => {
+  const handleStopListening = useCallback(async () => {
     try {
-      if (conversation) {
-        await conversation.endSession()
-      }
-      dispatch({type: 'SET_IS_LISTENING', payload: false})
+      await conversation.endSession()
     } catch (err) {
       dispatch({type: 'SET_ERROR', payload: err instanceof Error ? err.message : 'Failed to stop conversation'})
     }
-  }
+  }, [conversation])
 
   const conversationID = conversation.status === 'connected' ? conversation.getId() : null
 
