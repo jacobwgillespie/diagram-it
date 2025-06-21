@@ -10,9 +10,10 @@ interface HistoryEntryProps {
     content: string
   }
   isCurrent: boolean
+  onClick?: () => void
 }
 
-export function HistoryEntry({entry, isCurrent}: HistoryEntryProps) {
+export function HistoryEntry({entry, isCurrent, onClick}: HistoryEntryProps) {
   const entryRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -21,7 +22,16 @@ export function HistoryEntry({entry, isCurrent}: HistoryEntryProps) {
   }, [isCurrent])
 
   return (
-    <div ref={entryRef} className={cx('space-y-2 rounded p-4', isCurrent && 'border border-green-700 bg-green-900/30')}>
+    <div 
+      ref={entryRef} 
+      className={cx(
+        'space-y-2 rounded p-4 transition-colors border',
+        isCurrent ? 'border-green-700 bg-green-900/30' : 'border-transparent',
+        onClick && 'cursor-pointer',
+        onClick && !isCurrent && 'hover:bg-neutral-800/50'
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className={cx('text-xs font-medium', entry.type === 'user' ? 'text-green-400' : 'text-blue-400')}>
           {entry.type.toUpperCase().replace('-', ' ')}

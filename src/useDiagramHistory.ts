@@ -24,6 +24,7 @@ interface DiagramHistoryActions {
   addAgentCode: (code: string, prompt: string) => void
   updateCurrentEntry: (content: string) => void
   getCurrentDiagramCode: () => string
+  goToIndex: (index: number) => void
   // Expose history data for debugging
   entries: DiagramHistoryEntry[]
   currentIndex: number
@@ -240,6 +241,18 @@ export function useDiagramHistory(
     return currentDiagramCode
   }, [currentDiagramCode])
 
+  const goToIndex = useCallback((index: number) => {
+    if (index < 0 || index >= entries.length || index === currentIndex) return
+
+    setHistory((prev) => {
+      const safePrev = prev || createInitialHistory
+      return {
+        ...safePrev,
+        currentIndex: index,
+      }
+    })
+  }, [entries.length, currentIndex, setHistory, createInitialHistory])
+
   const historyActions: DiagramHistoryActions = {
     canUndo,
     canRedo,
@@ -250,6 +263,7 @@ export function useDiagramHistory(
     addAgentCode,
     updateCurrentEntry,
     getCurrentDiagramCode,
+    goToIndex,
     entries: entries,
     currentIndex: currentIndex,
   }

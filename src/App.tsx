@@ -1,5 +1,5 @@
 import {useConversation} from '@elevenlabs/react'
-import {useCallback, useEffect, useReducer, useRef} from 'react'
+import {useCallback, useEffect, useReducer, useRef, useState} from 'react'
 import {generateDiagramStreaming} from './diagram'
 import {HistoryEntry} from './HistoryEntry'
 import {
@@ -109,6 +109,7 @@ export function App() {
       lastValidDiagram.current = currentDiagram
     }
   }, [currentDiagram])
+
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -265,7 +266,12 @@ export function App() {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-neutral-700 bg-neutral-950 p-4">
           <div className="space-y-1 text-xs">
             {diagramHistory.entries.map((entry, index) => (
-              <HistoryEntry key={entry.id} entry={entry} isCurrent={index === diagramHistory.currentIndex} />
+              <HistoryEntry 
+                key={entry.id} 
+                entry={entry} 
+                isCurrent={index === diagramHistory.currentIndex}
+                onClick={() => diagramHistory.goToIndex(index)}
+              />
             ))}
 
             {diagramHistory.entries.length === 0 && (

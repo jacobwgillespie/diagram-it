@@ -35,6 +35,7 @@ type Action =
   | {type: 'START_DRAG'; payload: {x: number; y: number}}
   | {type: 'STOP_DRAG'}
   | {type: 'RESET_VIEW'; payload: {containerWidth: number; containerHeight: number}}
+  | {type: 'FORCE_RECENTER'}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -82,6 +83,11 @@ function reducer(state: State, action: Action): State {
         hasUserInteracted: false,
       }
     }
+    case 'FORCE_RECENTER':
+      return {
+        ...state,
+        hasUserInteracted: false,
+      }
     default:
       return state
   }
@@ -108,6 +114,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   const svgRef = useRef<SVGElement>(null)
   const diagramId = useRef(id || `mermaid-${Math.random().toString(36).substr(2, 9)}`)
   const [state, dispatch] = useReducer(reducer, initialState)
+  const previousDiagram = useRef(safeDiagram)
 
   useEffect(() => {
     // Initialize mermaid with default configuration
@@ -123,6 +130,14 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
     initializeMermaid()
   }, [])
+
+  // Reset hasUserInteracted when diagram content changes
+  useEffect(() => {
+    if (previousDiagram.current !== safeDiagram) {
+      dispatch({type: 'FORCE_RECENTER'})
+      previousDiagram.current = safeDiagram
+    }
+  }, [safeDiagram])
 
   useEffect(() => {
     if (!state.isInitialized) return
