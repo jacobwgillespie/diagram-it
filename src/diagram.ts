@@ -127,7 +127,6 @@ export async function generateDiagramStreaming(
       for (const line of lines) {
         try {
           const event = JSON.parse(line)
-          console.log('event', event)
 
           if (event.event === 'token' && event.data?.chunk) {
             const tokenChunk = event.data.chunk

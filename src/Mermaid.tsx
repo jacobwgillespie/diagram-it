@@ -294,9 +294,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({
           const parentContainer = containerRef.current.parentElement
           if (!parentContainer) return prev
 
-          // Define zoom constraints
-          const minZoom = 0.5 // 50% minimum zoom
-          const maxZoom = 5 // 500% maximum zoom
+          // Define zoom constraints relative to native size
+          const minZoom = 0.1 // 10% minimum zoom
+          const maxZoom = Math.max(5, Math.min(20, 2000 / Math.min(state.originalSvgSize.width, state.originalSvgSize.height))) // Scale max zoom based on diagram size
 
           // Calculate new scale with constraints
           const newScale = Math.max(minZoom, Math.min(maxZoom, prev.scale * delta))
@@ -308,26 +308,35 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
           const scaleRatio = newScale / prev.scale
 
-          // Calculate new position after zoom
-          let newX = mouseX - (mouseX - prev.x) * scaleRatio
-          let newY = mouseY - (mouseY - prev.y) * scaleRatio
-
           // Apply pan constraints to keep diagram visible after zoom
           const containerWidth = parentContainer.offsetWidth
           const containerHeight = parentContainer.offsetHeight
+
+          // Calculate new position after zoom with dampening
+          // Mix between mouse-centered zoom and center-based zoom for smoother behavior
+          const centerX = containerWidth / 2
+          const centerY = containerHeight / 2
+          const dampening = 0.3 // 30% mouse influence, 70% center influence
+          
+          const mouseCenteredX = mouseX - (mouseX - prev.x) * scaleRatio
+          const mouseCenteredY = mouseY - (mouseY - prev.y) * scaleRatio
+          const centerCenteredX = centerX - (centerX - prev.x) * scaleRatio
+          const centerCenteredY = centerY - (centerY - prev.y) * scaleRatio
+          
+          let newX = mouseCenteredX * dampening + centerCenteredX * (1 - dampening)
+          let newY = mouseCenteredY * dampening + centerCenteredY * (1 - dampening)
+          
+          // Apply constraints - ensure at least some of the diagram is always visible
           const scaledWidth = state.originalSvgSize.width * newScale
           const scaledHeight = state.originalSvgSize.height * newScale
-
-          // Keep at least 50px of the diagram visible
-          const minVisible = 50
-
-          // Calculate constraints
+          
+          // Keep at least 100px of the diagram visible on each side
+          const minVisible = 100
           const maxX = containerWidth - minVisible
           const minX = minVisible - scaledWidth
-          const maxY = containerHeight - minVisible
+          const maxY = containerHeight - minVisible  
           const minY = minVisible - scaledHeight
-
-          // Apply constraints
+          
           newX = Math.max(minX, Math.min(maxX, newX))
           newY = Math.max(minY, Math.min(maxY, newY))
 
@@ -337,6 +346,22 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     },
     [state.originalSvgSize],
   )
+
+  // Handle wheel events with passive: false to allow preventDefault
+  useEffect(() => {
+    const container = containerRef.current?.parentElement
+    if (!container) return
+
+    const wheelHandler = (e: WheelEvent) => {
+      handleWheel(e as any)
+    }
+
+    container.addEventListener('wheel', wheelHandler, { passive: false })
+
+    return () => {
+      container.removeEventListener('wheel', wheelHandler)
+    }
+  }, [handleWheel])
 
   const resetView = useCallback(() => {
     if (!containerRef.current || state.originalSvgSize.width === 0) return
@@ -367,15 +392,45 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       type: 'UPDATE_TRANSFORM',
       payload: (prev) => {
         const zoomFactor = 1.2 // 20% zoom in
-        const newScale = Math.min(5, prev.scale * zoomFactor) // Max 500% zoom
+        const maxZoom = Math.max(5, Math.min(20, 2000 / Math.min(state.originalSvgSize.width, state.originalSvgSize.height)))
+        const newScale = Math.min(maxZoom, prev.scale * zoomFactor)
 
         if (newScale === prev.scale) return prev
 
-        const scaleRatio = newScale / prev.scale
-
-        // Zoom towards center of viewport
-        const newX = centerX - (centerX - prev.x) * scaleRatio
-        const newY = centerY - (centerY - prev.y) * scaleRatio
+        // Center the diagram in the viewport at the new scale (like reset view)
+        const scaledWidth = state.originalSvgSize.width * newScale
+        const scaledHeight = state.originalSvgSize.height * newScale
+        
+        // Check if diagram fits in viewport, if not, apply constraints like reset view
+        const padding = 80
+        const availableWidth = containerWidth - padding
+        const availableHeight = containerHeight - padding
+        
+        let finalX, finalY
+        
+        if (scaledWidth <= availableWidth && scaledHeight <= availableHeight) {
+          // Diagram fits, center it normally
+          finalX = (containerWidth - scaledWidth) / 2
+          finalY = (containerHeight - scaledHeight) / 2
+        } else {
+          // Diagram too large, use constraint logic similar to reset view but maintain scale
+          // Keep some visible area but allow overflow
+          const minVisible = 100
+          const maxX = containerWidth - minVisible
+          const minX = minVisible - scaledWidth
+          const maxY = containerHeight - minVisible
+          const minY = minVisible - scaledHeight
+          
+          // Try to center, but constrain if needed
+          const centeredX = (containerWidth - scaledWidth) / 2
+          const centeredY = (containerHeight - scaledHeight) / 2
+          
+          finalX = Math.max(minX, Math.min(maxX, centeredX))
+          finalY = Math.max(minY, Math.min(maxY, centeredY))
+        }
+        
+        const newX = finalX
+        const newY = finalY
 
         return {x: newX, y: newY, scale: newScale}
       },
@@ -397,15 +452,45 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       type: 'UPDATE_TRANSFORM',
       payload: (prev) => {
         const zoomFactor = 0.8 // 20% zoom out
-        const newScale = Math.max(0.5, prev.scale * zoomFactor) // Min 50% zoom
+        const minZoom = 0.1 // 10% minimum zoom
+        const newScale = Math.max(minZoom, prev.scale * zoomFactor)
 
         if (newScale === prev.scale) return prev
 
-        const scaleRatio = newScale / prev.scale
-
-        // Zoom towards center of viewport
-        const newX = centerX - (centerX - prev.x) * scaleRatio
-        const newY = centerY - (centerY - prev.y) * scaleRatio
+        // Center the diagram in the viewport at the new scale (like reset view)
+        const scaledWidth = state.originalSvgSize.width * newScale
+        const scaledHeight = state.originalSvgSize.height * newScale
+        
+        // Check if diagram fits in viewport, if not, apply constraints like reset view
+        const padding = 80
+        const availableWidth = containerWidth - padding
+        const availableHeight = containerHeight - padding
+        
+        let finalX, finalY
+        
+        if (scaledWidth <= availableWidth && scaledHeight <= availableHeight) {
+          // Diagram fits, center it normally
+          finalX = (containerWidth - scaledWidth) / 2
+          finalY = (containerHeight - scaledHeight) / 2
+        } else {
+          // Diagram too large, use constraint logic similar to reset view but maintain scale
+          // Keep some visible area but allow overflow
+          const minVisible = 100
+          const maxX = containerWidth - minVisible
+          const minX = minVisible - scaledWidth
+          const maxY = containerHeight - minVisible
+          const minY = minVisible - scaledHeight
+          
+          // Try to center, but constrain if needed
+          const centeredX = (containerWidth - scaledWidth) / 2
+          const centeredY = (containerHeight - scaledHeight) / 2
+          
+          finalX = Math.max(minX, Math.min(maxX, centeredX))
+          finalY = Math.max(minY, Math.min(maxY, centeredY))
+        }
+        
+        const newX = finalX
+        const newY = finalY
 
         return {x: newX, y: newY, scale: newScale}
       },
@@ -424,15 +509,32 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         type: 'UPDATE_TRANSFORM',
         payload: (prev) => {
           const zoomFactor = 1.5 // 50% zoom in on double-click
-          const newScale = Math.min(5, prev.scale * zoomFactor) // Max 500% zoom
+          const maxZoom = Math.max(5, Math.min(20, 2000 / Math.min(state.originalSvgSize.width, state.originalSvgSize.height)))
+          const newScale = Math.min(maxZoom, prev.scale * zoomFactor)
 
           if (newScale === prev.scale) return prev
 
           const scaleRatio = newScale / prev.scale
 
           // Zoom towards the clicked point
-          const newX = mouseX - (mouseX - prev.x) * scaleRatio
-          const newY = mouseY - (mouseY - prev.y) * scaleRatio
+          let newX = mouseX - (mouseX - prev.x) * scaleRatio
+          let newY = mouseY - (mouseY - prev.y) * scaleRatio
+
+          // Apply the same constraints as wheel zoom to prevent jumping
+          const scaledWidth = state.originalSvgSize.width * newScale
+          const scaledHeight = state.originalSvgSize.height * newScale
+          
+          // Keep at least 100px of the diagram visible on each side
+          const minVisible = 100
+          const containerWidth = containerRef.current?.parentElement?.offsetWidth || 0
+          const containerHeight = containerRef.current?.parentElement?.offsetHeight || 0
+          const maxX = containerWidth - minVisible
+          const minX = minVisible - scaledWidth
+          const maxY = containerHeight - minVisible  
+          const minY = minVisible - scaledHeight
+          
+          newX = Math.max(minX, Math.min(maxX, newX))
+          newY = Math.max(minY, Math.min(maxY, newY))
 
           return {x: newX, y: newY, scale: newScale}
         },
@@ -455,7 +557,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         userSelect: 'none',
       }}
       onMouseDown={handleMouseDown}
-      onWheel={handleWheel}
       onDoubleClick={handleDoubleClick}
     >
       <div

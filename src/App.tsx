@@ -43,7 +43,6 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_ERROR':
-      console.log('SET_ERROR', action.payload)
       // Only update if the error has actually changed
       if (state.error === action.payload) {
         return state // No change, return same state to prevent unnecessary re-renders
@@ -174,7 +173,7 @@ export function App() {
       await conversation.startSession({
         agentId: AGENT_ID,
         onConnect() {
-          void conversation.setVolume({volume: 0.1})
+          // void conversation.setVolume({volume: 0.1})
         },
       })
     } catch (err) {
